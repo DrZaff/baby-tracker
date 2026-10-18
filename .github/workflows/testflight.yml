@@ -63,7 +63,7 @@ jobs:
       - name: Use the newest Xcode
         run: |
           # App Store Connect only accepts builds made with the current Xcode SDK.
-          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | grep -viE "beta|_rc" | sort -V | tail -1)"
           xcodebuild -version
 
       - name: Generate the Xcode project
