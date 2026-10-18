@@ -7,7 +7,7 @@ APP_BUNDLE_ID = com.drzaff.littlelog
 APP_TEAM_ID =
 
 // Copy REVERSED_CLIENT_ID from LittleLog/GoogleService-Info.plist.
-REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE_ME
+REVERSED_CLIENT_ID = com.googleusercontent.apps.77243092185-1eud0q6c8s74p7hnd9c4r1sq5arq3ou4
 
 // Signing. The TestFlight workflow overrides these for App Store builds.
 APP_SIGN_STYLE = Automatic
