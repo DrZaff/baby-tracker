@@ -1,0 +1,12 @@
+.DS_Store
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+build/
+LittleLog/Info.plist
+LittleLog/GoogleService-Info.plist
+firebase/functions/node_modules/
+firebase/.firebase/
+firebase/.firebaserc
+LittleLog/LittleLog.entitlements

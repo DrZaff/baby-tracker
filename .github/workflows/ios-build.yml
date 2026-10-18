@@ -1,0 +1,39 @@
+name: iOS build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build for the iOS simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project LittleLog.xcodeproj \
+            -scheme LittleLog \
+            -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build.log | grep -E "error:|warning: .*LittleLog/|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Check the notification function loads
+        working-directory: firebase/functions
+        run: |
+          npm install --no-audit --no-fund
+          node -e "require('./index.js'); console.log('functions OK')"

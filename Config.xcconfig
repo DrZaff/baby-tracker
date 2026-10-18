@@ -1,0 +1,10 @@
+// Fill these in once (see README, "Set up on your Mac").
+
+// A unique app id. Change "drzaff" if Xcode says it is taken.
+APP_BUNDLE_ID = com.drzaff.littlelog
+
+// Your Apple Developer Team ID (10 characters, from developer.apple.com > Membership).
+APP_TEAM_ID =
+
+// Copy REVERSED_CLIENT_ID from LittleLog/GoogleService-Info.plist.
+REVERSED_CLIENT_ID = com.googleusercontent.apps.REPLACE_ME

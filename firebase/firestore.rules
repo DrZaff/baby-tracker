@@ -1,0 +1,47 @@
+rules_version = '2';
+
+// Access model: a baby's document lists the Google emails of its caregivers
+// (memberEmails). Anyone signed in with one of those emails can read and write
+// everything for that baby.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isMember(babyData) {
+      return signedIn() && myEmail() in babyData.memberEmails;
+    }
+
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /babies/{babyId} {
+      allow read: if isMember(resource.data);
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail()
+        && request.resource.data.memberEmails == [myEmail()];
+
+      // Any caregiver can edit the profile and invite or remove others,
+      // but the owner can't be changed or removed.
+      allow update: if isMember(resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && resource.data.ownerEmail in request.resource.data.memberEmails
+        && request.resource.data.memberEmails.size() <= 20;
+
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      match /{document=**} {
+        allow read, write: if isMember(get(/databases/$(database)/documents/babies/$(babyId)).data);
+      }
+    }
+  }
+}

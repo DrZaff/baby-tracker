@@ -1,0 +1,19 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isMember(babyId) {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in
+          firestore.get(/databases/(default)/documents/babies/$(babyId)).data.memberEmails;
+    }
+
+    match /babies/{babyId}/{allPaths=**} {
+      allow read, delete: if isMember(babyId);
+      allow create, update: if isMember(babyId)
+        && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
