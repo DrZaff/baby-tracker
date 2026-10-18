@@ -1,14 +1,12 @@
 import SwiftUI
 
 enum EntryTemplate: String, CaseIterable, Identifiable {
-    case breast, bottle, pump, diaper, weight, milestone, daycare
+    case feed, diaper, weight, milestone, daycare
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .breast: return "Breast"
-        case .bottle: return "Bottle"
-        case .pump: return "Pump"
+        case .feed: return "Feed"
         case .diaper: return "Diaper"
         case .weight: return "Weight"
         case .milestone: return "Milestone"
@@ -18,9 +16,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .breast: return "heart.fill"
-        case .bottle: return "drop.fill"
-        case .pump: return "drop.circle"
+        case .feed: return "heart.fill"
         case .diaper: return "humidity.fill"
         case .weight: return "scalemass.fill"
         case .milestone: return "star.fill"
@@ -30,9 +26,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
 
     var tint: Color {
         switch self {
-        case .breast: return Theme.feed
-        case .bottle: return Theme.bottle
-        case .pump: return Theme.pump
+        case .feed: return Theme.feed
         case .diaper: return Theme.diaper
         case .weight: return Theme.weight
         case .milestone: return Theme.milestone
@@ -64,9 +58,7 @@ struct EntryEditor: View {
             switch sheet {
             case .new(let template):
                 switch template {
-                case .breast: FeedFormView(babyID: babyID, existing: nil, start: .breast, defaultDate: defaultDate)
-                case .bottle: FeedFormView(babyID: babyID, existing: nil, start: .bottle, defaultDate: defaultDate)
-                case .pump: FeedFormView(babyID: babyID, existing: nil, start: .pump, defaultDate: defaultDate)
+                case .feed: FeedFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .diaper: DiaperFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .weight: WeightFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .milestone: MilestoneFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
@@ -74,7 +66,7 @@ struct EntryEditor: View {
                 }
             case .edit(let entry):
                 switch entry.kind {
-                case .feed: FeedFormView(babyID: babyID, existing: entry, start: .breast, defaultDate: entry.timestamp)
+                case .feed: FeedFormView(babyID: babyID, existing: entry, defaultDate: entry.timestamp)
                 case .diaper: DiaperFormView(babyID: babyID, existing: entry, defaultDate: entry.timestamp)
                 case .weight: WeightFormView(babyID: babyID, existing: entry, defaultDate: entry.timestamp)
                 case .milestone: MilestoneFormView(babyID: babyID, existing: entry, defaultDate: entry.timestamp)

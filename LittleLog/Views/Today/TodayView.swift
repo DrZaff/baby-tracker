@@ -251,7 +251,7 @@ struct QuickAddGrid: View {
     let onSelect: (EntryTemplate) -> Void
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 4), spacing: 14) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 14) {
             ForEach(EntryTemplate.allCases) { template in
                 Button {
                     onSelect(template)

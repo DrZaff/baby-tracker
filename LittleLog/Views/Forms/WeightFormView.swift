@@ -44,20 +44,13 @@ struct WeightFormView: View {
                 DatePicker("Date", selection: $time)
             }
             Section("Weight") {
-                Picker("Units", selection: $metric) {
-                    Text("lb & oz").tag(false)
-                    Text("kg").tag(true)
-                }
-                .pickerStyle(.segmented)
-                if metric {
-                    HStack {
+                HStack {
+                    if metric {
                         TextField("0.00", value: $kilograms, format: .number)
                             .keyboardType(.decimalPad)
                             .font(.title2)
                         Text("kg").foregroundStyle(.secondary)
-                    }
-                } else {
-                    HStack {
+                    } else {
                         TextField("0", value: $pounds, format: .number)
                             .keyboardType(.numberPad)
                             .font(.title2)
@@ -67,6 +60,8 @@ struct WeightFormView: View {
                             .font(.title2)
                         Text("oz").foregroundStyle(.secondary)
                     }
+                    Spacer()
+                    UnitSwitch(options: ["lb", "kg"], metric: $metric)
                 }
             }
             Section("Notes") {

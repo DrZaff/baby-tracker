@@ -1,7 +1,5 @@
 import SwiftUI
 
-enum FeedComponent { case breast, bottle, pump }
-
 struct FeedFormView: View {
     @Environment(AuthService.self) private var auth
 
@@ -22,21 +20,15 @@ struct FeedFormView: View {
     @State private var pumpedAmount: Double?
     @State private var notes: String
 
-    init(babyID: String, existing: LogEntry?, start: FeedComponent, defaultDate: Date) {
+    init(babyID: String, existing: LogEntry?, defaultDate: Date) {
         self.babyID = babyID
         self.existing = existing
         let metric = existing?.metric ?? UserDefaults.standard.bool(forKey: "useMetric")
         _metric = State(initialValue: metric)
         _time = State(initialValue: existing?.timestamp ?? defaultDate)
-        if let e = existing {
-            _includeBreast = State(initialValue: e.hasBreast)
-            _includeBottle = State(initialValue: e.hasBottle)
-            _includePump = State(initialValue: e.hasPump)
-        } else {
-            _includeBreast = State(initialValue: start == .breast)
-            _includeBottle = State(initialValue: start == .bottle)
-            _includePump = State(initialValue: start == .pump)
-        }
+        _includeBreast = State(initialValue: existing?.hasBreast ?? false)
+        _includeBottle = State(initialValue: existing?.hasBottle ?? false)
+        _includePump = State(initialValue: existing?.hasPump ?? false)
         _breastLeft = State(initialValue: SideTimer(seconds: existing?.breastLeftSeconds))
         _breastRight = State(initialValue: SideTimer(seconds: existing?.breastRightSeconds))
         _bottleAmount = State(initialValue: existing?.bottleML.map { Units.volumeValue($0, metric: metric) })
@@ -46,8 +38,6 @@ struct FeedFormView: View {
         _pumpedAmount = State(initialValue: existing?.pumpedML.map { Units.volumeValue($0, metric: metric) })
         _notes = State(initialValue: existing?.notes ?? "")
     }
-
-    private var unit: String { Units.volumeUnit(metric: metric) }
 
     private var hasContent: Bool {
         (includeBreast && (breastLeft.elapsed() > 0 || breastRight.elapsed() > 0 || breastLeft.isRunning || breastRight.isRunning))
@@ -59,13 +49,6 @@ struct FeedFormView: View {
         Form {
             Section {
                 DatePicker("Started", selection: $time)
-                if includeBottle || includePump {
-                    Picker("Units", selection: $metric) {
-                        Text("oz").tag(false)
-                        Text("ml").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                }
             }
 
             Section {
@@ -78,7 +61,7 @@ struct FeedFormView: View {
                     SideTimerRow(label: "Right", tint: Theme.feed, timer: $breastRight) { breastLeft.pause() }
                 }
             } footer: {
-                if includeBreast { Text("Tap play to time each side, or use − / + to enter minutes.") }
+                if includeBreast { Text("Tap play to time each side, use − / + to change it a minute at a time, or tap the time to type it.") }
             }
 
             Section {
@@ -91,7 +74,7 @@ struct FeedFormView: View {
                         ForEach(BottleContent.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    AmountField(title: "Amount", unit: unit, value: $bottleAmount)
+                    AmountField(title: "Amount", value: $bottleAmount, metric: $metric)
                 }
             }
 
@@ -103,7 +86,7 @@ struct FeedFormView: View {
                 if includePump {
                     SideTimerRow(label: "Left", tint: Theme.pump, timer: $pumpLeft)
                     SideTimerRow(label: "Right", tint: Theme.pump, timer: $pumpRight)
-                    AmountField(title: "Amount pumped", unit: unit, value: $pumpedAmount)
+                    AmountField(title: "Amount pumped", value: $pumpedAmount, metric: $metric)
                 }
             }
 
@@ -170,10 +153,11 @@ struct FeedFormView: View {
     }
 }
 
+/// An amount with an oz / ml switch right beside it.
 struct AmountField: View {
     let title: String
-    let unit: String
     @Binding var value: Double?
+    @Binding var metric: Bool
 
     var body: some View {
         HStack {
@@ -182,9 +166,25 @@ struct AmountField: View {
             TextField("0", value: $value, format: .number)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 100)
-            Text(unit).foregroundStyle(.secondary)
+                .frame(maxWidth: 80)
+            UnitSwitch(options: ["oz", "ml"], metric: $metric)
         }
+    }
+}
+
+/// A small two-option unit switch (standard, metric) placed next to a number.
+struct UnitSwitch: View {
+    let options: [String]
+    @Binding var metric: Bool
+
+    var body: some View {
+        Picker("Units", selection: $metric) {
+            Text(options[0]).tag(false)
+            Text(options[1]).tag(true)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
     }
 }
 

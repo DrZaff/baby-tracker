@@ -26,6 +26,11 @@ struct SideTimer: Equatable {
         runningSince = nil
     }
 
+    mutating func set(seconds: Int) {
+        runningSince = nil
+        accumulated = TimeInterval(max(0, seconds))
+    }
+
     mutating func adjust(by delta: TimeInterval) {
         pause()
         accumulated = max(0, accumulated + delta)
@@ -42,16 +47,30 @@ struct SideTimerRow: View {
     @Binding var timer: SideTimer
     var onStart: () -> Void = {}
 
+    @State private var isTyping = false
+    @State private var minutesText = ""
+    @State private var secondsText = ""
+
     var body: some View {
         HStack(spacing: 12) {
             Text(label)
                 .font(.headline)
                 .frame(width: 48, alignment: .leading)
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(Units.clock(timer.elapsed(at: context.date)))
-                    .font(.title2.monospacedDigit().weight(.medium))
-                    .foregroundStyle(timer.isRunning ? tint : .primary)
+            Button {
+                timer.pause()
+                minutesText = String(timer.seconds / 60)
+                secondsText = String(timer.seconds % 60)
+                isTyping = true
+            } label: {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(Units.clock(timer.elapsed(at: context.date)))
+                        .font(.title2.monospacedDigit().weight(.medium))
+                        .foregroundStyle(timer.isRunning ? tint : .primary)
+                        .underline(!timer.isRunning, color: .secondary.opacity(0.4))
+                }
             }
+            .buttonStyle(.borderless)
+            .accessibilityHint("Type the time")
             Spacer()
             Button { timer.adjust(by: -60) } label: {
                 Image(systemName: "minus.circle").font(.title3)
@@ -78,5 +97,19 @@ struct SideTimerRow: View {
             .buttonStyle(.borderless)
         }
         .padding(.vertical, 4)
+        .alert("\(label) time", isPresented: $isTyping) {
+            TextField("Minutes", text: $minutesText)
+                .keyboardType(.numberPad)
+            TextField("Seconds", text: $secondsText)
+                .keyboardType(.numberPad)
+            Button("Cancel", role: .cancel) {}
+            Button("Set") {
+                let minutes = Int(minutesText.trimmingCharacters(in: .whitespaces)) ?? 0
+                let seconds = Int(secondsText.trimmingCharacters(in: .whitespaces)) ?? 0
+                timer.set(seconds: minutes * 60 + seconds)
+            }
+        } message: {
+            Text("Enter minutes and seconds.")
+        }
     }
 }

@@ -275,6 +275,14 @@ struct WeightChart: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            if let entry = selected ?? sorted.last, let index = sorted.firstIndex(of: entry), index > 0 {
+                HStack(spacing: 16) {
+                    WeightChange(title: "Since previous", from: sorted[index - 1].weightGrams, to: entry.weightGrams)
+                    if index > 1 {
+                        WeightChange(title: "Over this period", from: sorted[0].weightGrams, to: entry.weightGrams)
+                    }
+                }
+            }
             if sorted.isEmpty {
                 Text("Log a weight to see growth over time.")
                     .font(.subheadline)
@@ -302,5 +310,38 @@ struct WeightChart: View {
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+/// Percent gained or lost between two weigh-ins.
+struct WeightChange: View {
+    let title: String
+    let from: Double?
+    let to: Double?
+
+    private var percent: Double? {
+        guard let from, let to, from > 0 else { return nil }
+        return (to - from) / from * 100
+    }
+
+    var body: some View {
+        if let percent {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption).foregroundStyle(.secondary)
+                Label(text(percent), systemImage: symbol(percent))
+                    .font(.subheadline.weight(.semibold))
+            }
+        }
+    }
+
+    private func text(_ percent: Double) -> String {
+        let amount = String(format: "%.1f%%", abs(percent))
+        if amount == "0.0%" { return "No change" }
+        return percent > 0 ? "Gained \(amount)" : "Lost \(amount)"
+    }
+
+    private func symbol(_ percent: Double) -> String {
+        if abs(percent) < 0.05 { return "equal.circle" }
+        return percent > 0 ? "arrow.up.right.circle" : "arrow.down.right.circle"
     }
 }
