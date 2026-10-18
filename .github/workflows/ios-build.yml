@@ -1,8 +1,8 @@
 name: iOS build
 
+# Checks that the code compiles. Runs on pull requests and on demand only,
+# because cloud Mac minutes are limited on private repositories.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 

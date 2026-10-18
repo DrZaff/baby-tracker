@@ -14,55 +14,80 @@ A shared baby tracker for iPhone. Everyone who cares for the baby signs in with 
 
 Built with SwiftUI, Swift Charts and Firebase (Google sign-in, Firestore, Storage, push notifications through Cloud Functions).
 
-## Set up (one time)
+## Set up (one time, no Mac needed)
 
-You need a Mac with Xcode, an Apple Developer Program membership ($99/year, needed for notifications and TestFlight), and a Google account for Firebase.
+Everything below happens in a web browser. A cloud Mac on GitHub builds the app and sends it to TestFlight, Apple's free app for installing test builds. You need:
 
-### 1. Firebase project
+- an **Apple Developer Program** membership ($99/year): [enroll here](https://developer.apple.com/programs/enroll) with the Apple Account on your iPhone,
+- a Google account for **Firebase**.
 
-1. Go to [console.firebase.google.com](https://console.firebase.google.com), click **Add project**, name it (for example `little-log`). Analytics can be off.
-2. Upgrade to the **Blaze** (pay as you go) plan under the gear icon > Usage and billing. Photo storage and notifications require it. A family's usage fits in the free allowance; set a budget alert of a few dollars to be safe.
-3. **Authentication** > Get started > Sign-in method > enable **Google**.
-4. **Firestore Database** > Create database > production mode, pick a region near you.
-5. **Storage** > Get started > production mode.
-6. Project settings (gear) > General > **Add app** > iOS. Bundle ID: `com.drzaff.littlelog` (or whatever you put in `Config.xcconfig`). Download **GoogleService-Info.plist** and put it in the `LittleLog/` folder of this repo.
+The bundle ID used below is `com.drzaff.littlelog`. Use the same one everywhere.
 
-### 2. Push notifications
+### 1. Firebase
 
-1. At [developer.apple.com](https://developer.apple.com/account/resources/authkeys/list) > Keys, create a key with **Apple Push Notifications service (APNs)** enabled. Download the `.p8` file and note the Key ID and your Team ID.
-2. In Firebase: Project settings > **Cloud Messaging** > Apple app configuration > upload the `.p8` key with its Key ID and Team ID.
+1. At [console.firebase.google.com](https://console.firebase.google.com), create a project. Google Analytics can stay off.
+2. Click **Upgrade** (bottom left) and choose the **Blaze** plan. Photo storage and notifications require it, and a family's usage stays in the free allowance. Set a budget alert of a few dollars.
+3. **Build > Authentication > Get started > Google > Enable**, then Save.
+4. **Build > Firestore Database > Create database**, production mode, a location near you.
+5. **Build > Storage > Get started**, production mode, the same location.
+6. Gear icon > **Project settings > General > Add app > iOS**. Bundle ID `com.drzaff.littlelog`, nickname "Little Log". Download **GoogleService-Info.plist** and skip the remaining wizard steps. Put the file in the `LittleLog/` folder of this repo (or hand it to Claude to commit).
 
-### 3. Deploy the rules and the notification function
+### 2. Deploy the security rules and notification function (Google Cloud Shell)
 
-In Terminal, from this repo:
+1. On this repo's GitHub page, click **Code > Download ZIP**.
+2. Open [console.cloud.google.com](https://console.cloud.google.com), pick your Firebase project at the top, and click the **Cloud Shell** icon (`>_`, top right).
+3. In Cloud Shell, open the **⋮** menu > **Upload** and choose the ZIP.
+4. Paste these lines, replacing `YOUR-PROJECT-ID` with your project ID (shown under the project name in Firebase, like `little-log-be12c`):
 
-```sh
-npm install -g firebase-tools
-firebase login
-cd firebase
-firebase use --add            # pick your project
-(cd functions && npm install)
-firebase deploy               # rules + notification function
-```
+   ```sh
+   unzip -oq baby-tracker-main.zip && cd baby-tracker-main/firebase
+   (cd functions && npm install --no-audit --no-fund)
+   firebase login --no-localhost
+   firebase deploy --project YOUR-PROJECT-ID
+   ```
 
-### 4. Build the app
+   `firebase login` shows a link. Open it, sign in, and paste the code back. If deploy asks to grant Storage a role for cross-service rules, answer **Y**.
 
-```sh
-brew install xcodegen
-```
+Repeat this step whenever the files in `firebase/` change.
 
-1. Open `Config.xcconfig` and fill in `APP_TEAM_ID` (developer.apple.com > Membership) and `REVERSED_CLIENT_ID` (copy it from `GoogleService-Info.plist`).
-2. Run `xcodegen generate` in the repo folder, then open `LittleLog.xcodeproj`.
-3. Plug in your iPhone, pick it at the top of Xcode, and press Run. The first build downloads Firebase and takes a few minutes.
+### 3. Apple: app ID, push key and app record
 
-Run `xcodegen generate` again whenever you pull new code.
+1. **App ID**: [developer.apple.com > Identifiers](https://developer.apple.com/account/resources/identifiers/list) > **+** > App IDs > App. Description "Little Log", Bundle ID **Explicit** `com.drzaff.littlelog`, tick **Push Notifications**, then Register.
+2. **Push key**: [Keys](https://developer.apple.com/account/resources/authkeys/list) > **+**, name it "Little Log push", tick **Apple Push Notifications service (APNs)**, Continue, Register, **Download** the `.p8` file (you can only download it once). Note the **Key ID**.
+3. In Firebase: **Project settings > Cloud Messaging > Apple app configuration > APNs Authentication Key > Upload**. Choose that `.p8` file and enter its Key ID and your **Team ID** (shown at [developer.apple.com > Membership details](https://developer.apple.com/account#MembershipDetailsCard)).
+4. **App record**: [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > Apps > **+ > New App**. Platform iOS, name "Little Log" (if it's taken, add a word, since only the store listing uses it), bundle ID `com.drzaff.littlelog`, SKU `littlelog`, Full Access.
 
-### 5. Share it with your family (TestFlight)
+### 4. Connect GitHub to Apple
 
-1. At [appstoreconnect.apple.com](https://appstoreconnect.apple.com) > Apps > **+** > New App, choose the `com.drzaff.littlelog` bundle ID.
-2. In Xcode: choose **Any iOS Device**, then Product > **Archive** > Distribute App > TestFlight & App Store.
-3. In App Store Connect > TestFlight, add your partner and other caregivers as testers (Internal testing for people on your developer team, External testing for anyone by email).
-4. In the app, open **Family** > **Invite a caregiver** and enter the Google email each person will sign in with.
+1. In App Store Connect: **Users and Access > Integrations > App Store Connect API**. Request access if asked, then under **Team Keys** click **+**. Name it "GitHub", Access **Admin**, Generate.
+2. Note the **Issuer ID** (above the table) and the key's **Key ID**, then **Download** the `.p8` file (only possible once).
+3. On this repo on GitHub: **Settings > Secrets and variables > Actions > New repository secret**. Add four secrets:
+
+   | Name | Value |
+   |---|---|
+   | `APP_STORE_CONNECT_ISSUER_ID` | the Issuer ID |
+   | `APP_STORE_CONNECT_KEY_ID` | the Key ID |
+   | `APP_STORE_CONNECT_KEY` | open the `.p8` file in Notepad and paste all of it, including the BEGIN/END lines |
+   | `APPLE_TEAM_ID` | your Team ID |
+
+These keys stay in GitHub's encrypted secrets. Don't paste them into chats or commit them.
+
+### 5. Build and send to TestFlight
+
+1. On GitHub: **Actions > Send to TestFlight > Run workflow**. It takes about 15 minutes.
+2. In App Store Connect > your app > **TestFlight**, the build appears after Apple finishes processing it (usually 10 to 30 minutes).
+3. Under **Internal Testing**, create a group and add testers. Testers must first be added as users in **Users and Access** (any role works, for example "Customer Support"). Add yourself and your partner.
+4. Each tester installs **TestFlight** from the App Store, opens the email invite and taps Install.
+
+To ship a new version later, run the workflow again. TestFlight builds expire after 90 days, so run it at least that often.
+
+### 6. Start using it
+
+Open Little Log, sign in with Google, add your baby, then go to **Family > Invite a caregiver** and enter the Google email each person signs in with.
+
+### Optional: build on a Mac
+
+With a Mac, fill in `Config.xcconfig`, run `brew install xcodegen && xcodegen generate`, open `LittleLog.xcodeproj` and press Run.
 
 ## How sharing works
 
@@ -77,7 +102,8 @@ LittleLog/
   Services/    sign-in, Firestore and Storage access
   Views/       Today, Trends, Photos, Family and the logging forms
 firebase/      security rules and the notification Cloud Function
+scripts/       creates signing certificates from the App Store Connect API key
 project.yml    XcodeGen project definition
 ```
 
-Every push is built on a Mac by GitHub Actions (`.github/workflows/ios-build.yml`) to catch compile errors.
+GitHub Actions compiles every pull request on a cloud Mac (`ios-build.yml`) and builds TestFlight releases on demand (`testflight.yml`). Private repos get a limited number of free cloud Mac minutes each month (roughly a dozen TestFlight builds), so the workflows don't run on every push.
