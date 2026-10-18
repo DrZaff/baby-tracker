@@ -284,7 +284,7 @@ struct EntryRow: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                let detail = entry.detailText(metric: metric)
+                let detail = entry.detailText(metric: entry.metric ?? metric)
                 if !detail.isEmpty {
                     Text(detail).font(.subheadline).foregroundStyle(.secondary)
                 }

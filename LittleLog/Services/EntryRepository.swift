@@ -9,7 +9,7 @@ enum EntryRepository {
     /// Creates or updates an entry. Writes are queued offline and sync when back online.
     static func save(_ entry: LogEntry, babyID: String, auth: AuthService, metric: Bool) throws {
         var entry = entry
-        entry.summary = entry.makeSummary(metric: metric)
+        entry.summary = entry.makeSummary(metric: entry.metric ?? metric)
         let collection = entries(for: babyID)
         if let id = entry.id {
             entry.updatedByUid = auth.uid

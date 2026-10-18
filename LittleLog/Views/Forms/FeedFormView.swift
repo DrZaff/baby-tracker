@@ -4,12 +4,12 @@ enum FeedComponent { case breast, bottle, pump }
 
 struct FeedFormView: View {
     @Environment(AuthService.self) private var auth
-    @AppStorage("useMetric") private var useMetric = false
 
     let babyID: String
     let existing: LogEntry?
 
     @State private var time: Date
+    @State private var metric: Bool
     @State private var includeBreast: Bool
     @State private var includeBottle: Bool
     @State private var includePump: Bool
@@ -25,7 +25,8 @@ struct FeedFormView: View {
     init(babyID: String, existing: LogEntry?, start: FeedComponent, defaultDate: Date) {
         self.babyID = babyID
         self.existing = existing
-        let metric = UserDefaults.standard.bool(forKey: "useMetric")
+        let metric = existing?.metric ?? UserDefaults.standard.bool(forKey: "useMetric")
+        _metric = State(initialValue: metric)
         _time = State(initialValue: existing?.timestamp ?? defaultDate)
         if let e = existing {
             _includeBreast = State(initialValue: e.hasBreast)
@@ -46,7 +47,7 @@ struct FeedFormView: View {
         _notes = State(initialValue: existing?.notes ?? "")
     }
 
-    private var unit: String { Units.volumeUnit(metric: useMetric) }
+    private var unit: String { Units.volumeUnit(metric: metric) }
 
     private var hasContent: Bool {
         (includeBreast && (breastLeft.elapsed() > 0 || breastRight.elapsed() > 0 || breastLeft.isRunning || breastRight.isRunning))
@@ -58,6 +59,13 @@ struct FeedFormView: View {
         Form {
             Section {
                 DatePicker("Started", selection: $time)
+                if includeBottle || includePump {
+                    Picker("Units", selection: $metric) {
+                        Text("oz").tag(false)
+                        Text("ml").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                }
             }
 
             Section {
@@ -108,6 +116,11 @@ struct FeedFormView: View {
             }
         }
         .entryFormToolbar(existing == nil ? "Log feed" : "Edit feed", canSave: hasContent, save: save)
+        .onChange(of: metric) { old, new in
+            // Keep the same amount when switching units.
+            bottleAmount = bottleAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
+            pumpedAmount = pumpedAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
+        }
     }
 
     private func save() throws {
@@ -134,7 +147,7 @@ struct FeedFormView: View {
         }
 
         if includeBottle, let amount = bottleAmount, amount > 0 {
-            entry.bottleML = Units.millilitres(from: amount, metric: useMetric)
+            entry.bottleML = Units.millilitres(from: amount, metric: metric)
             entry.bottleContent = bottleContent
         } else {
             entry.bottleML = nil
@@ -146,13 +159,14 @@ struct FeedFormView: View {
         entry.pumpLeftSeconds = pl > 0 ? pl : nil
         entry.pumpRightSeconds = pr > 0 ? pr : nil
         if includePump, let amount = pumpedAmount, amount > 0 {
-            entry.pumpedML = Units.millilitres(from: amount, metric: useMetric)
+            entry.pumpedML = Units.millilitres(from: amount, metric: metric)
         } else {
             entry.pumpedML = nil
         }
 
+        entry.metric = entry.bottleML != nil || entry.pumpedML != nil ? metric : nil
         entry.notes = notes.trimmedOrNil
-        try EntryRepository.save(entry, babyID: babyID, auth: auth, metric: useMetric)
+        try EntryRepository.save(entry, babyID: babyID, auth: auth, metric: metric)
     }
 }
 

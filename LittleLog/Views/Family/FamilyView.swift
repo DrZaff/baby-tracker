@@ -95,7 +95,7 @@ struct FamilyView: View {
                 }
 
                 Section("Settings") {
-                    Toggle("Metric units (ml, kg)", isOn: $useMetric)
+                    Toggle("Metric by default (ml, kg)", isOn: $useMetric)
                     Button("Notification settings") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             UIApplication.shared.open(url)

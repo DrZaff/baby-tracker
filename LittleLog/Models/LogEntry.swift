@@ -36,6 +36,8 @@ struct LogEntry: Identifiable, Codable, Equatable {
     var updatedByUid: String?
     var updatedByName: String?
     var updatedAt: Date?
+    /// Units the amounts were entered in (true = ml/kg, false = oz/lb). Nil uses the app setting.
+    var metric: Bool?
 
     // Feed
     var breastLeftSeconds: Int?
