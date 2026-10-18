@@ -8,7 +8,7 @@ on:
 
 jobs:
   testflight:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     env:
       ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
@@ -34,7 +34,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/signing"
           printf '%s\n' "$ASC_KEY" > "$RUNNER_TEMP/signing/AuthKey_${ASC_KEY_ID}.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/signing/AuthKey_${ASC_KEY_ID}.p8" >> "$GITHUB_ENV"
-          echo "P12_PASSWORD=$(uuidgen)" >> "$GITHUB_ENV"
+          P12_PASSWORD=$(uuidgen)
+          echo "::add-mask::$P12_PASSWORD"
+          echo "P12_PASSWORD=$P12_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Create signing certificate and profile
         run: |
@@ -57,6 +59,12 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$RUNNER_TEMP/signing/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+      - name: Use the newest Xcode
+        run: |
+          # App Store Connect only accepts builds made with the current Xcode SDK.
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
 
       - name: Generate the Xcode project
         run: |
