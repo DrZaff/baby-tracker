@@ -7,16 +7,28 @@ struct SignInView: View {
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            Image(systemName: "heart.text.square.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(Theme.feed)
-            VStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [Theme.lime, Theme.leaf], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 170, height: 170)
+                    .shadow(color: Theme.canopy.opacity(0.3), radius: 18, y: 8)
+                Text("🐘").font(.system(size: 96)).offset(y: 6)
+                Text("🌺").font(.system(size: 36)).offset(x: 66, y: -62)
+                Text("🦜").font(.system(size: 40)).offset(x: -74, y: -40)
+                Text("🐒").font(.system(size: 40)).offset(x: 72, y: 56)
+            }
+            .accessibilityHidden(true)
+            VStack(spacing: 10) {
                 Text("Little Log")
-                    .font(.largeTitle.bold())
-                Text("Feeds, diapers, naps and firsts,\nshared with everyone who cares for your baby.")
+                    .font(.system(size: 44, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Theme.canopy)
+                Text("Feeds, diapers, growth and firsts,\nshared with everyone in your baby's jungle.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                Text("🦁 🦒 🦛 🐯 🦩")
+                    .font(.title2)
+                    .accessibilityHidden(true)
             }
             Spacer()
             Button {
@@ -35,6 +47,8 @@ struct SignInView: View {
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
+            .tint(Theme.canopy)
+            .shadow(color: Theme.canopy.opacity(0.3), radius: 10, y: 5)
             .disabled(isSigningIn)
 
             if let message = auth.errorMessage {
@@ -45,5 +59,6 @@ struct SignInView: View {
             }
         }
         .padding(32)
+        .background(JungleBackground())
     }
 }

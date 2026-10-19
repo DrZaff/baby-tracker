@@ -18,31 +18,43 @@ struct TodayView: View {
         NavigationStack {
             List {
                 Section {
-                    DayPicker(day: $day)
+                    TodayHeader(baby: baby, day: $day)
                 }
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
+                .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
 
                 if isToday {
                     Section {
                         SinceLastView(entries: recent.entries)
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                 }
 
-                Section("Daily report") {
-                    DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
-                }
-
-                Section("Log") {
+                Section {
                     QuickAddGrid { template in sheet = .new(template) }
-                        .listRowInsets(EdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 8))
+                        .padding(.vertical, 6)
+                } header: {
+                    JungleHeader(title: "Log something", icon: "🐾")
                 }
+                .listRowBackground(Theme.card)
 
-                Section(dayEntries.entries.isEmpty ? "Timeline" : "Timeline · \(dayEntries.entries.count)") {
+                Section {
+                    DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric)
+                } header: {
+                    JungleHeader(title: isToday ? "Today's report" : "Daily report", icon: "🌿")
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+
+                Section {
                     if dayEntries.hasLoaded && dayEntries.entries.isEmpty {
-                        Text(isToday ? "Nothing logged yet today." : "Nothing logged this day.")
-                            .foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Text("🦥").font(.largeTitle)
+                            Text(isToday ? "All quiet in the jungle so far today." : "Nothing logged this day.")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 6)
                     }
                     ForEach(dayEntries.entries) { entry in
                         Button {
@@ -59,18 +71,20 @@ struct TodayView: View {
                             }
                         }
                     }
+                } header: {
+                    JungleHeader(
+                        title: dayEntries.entries.isEmpty ? "Timeline" : "Timeline · \(dayEntries.entries.count)",
+                        icon: "🍃"
+                    )
                 }
+                .listRowBackground(Theme.card)
             }
             .listSectionSpacing(.compact)
-            .navigationTitle(baby.name)
+            .jungleBackground()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Text(baby.ageDescription)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
                 ToolbarItem(placement: .topBarTrailing) { BabySwitcher() }
             }
+            .toolbarBackground(.hidden, for: .navigationBar)
             .sheet(item: $sheet) { sheet in
                 EntryEditor(babyID: baby.babyID, sheet: sheet, defaultDate: defaultEntryDate(for: day))
             }
@@ -91,41 +105,89 @@ struct TodayView: View {
     }
 }
 
-struct DayPicker: View {
+/// Big friendly greeting with the baby's name, age and the day being viewed.
+struct TodayHeader: View {
+    let baby: Baby
     @Binding var day: Date
+
     private var calendar: Calendar { Calendar.current }
 
-    private var label: String {
+    private var greeting: (String, String) {
+        switch calendar.component(.hour, from: Date()) {
+        case 5..<12: return ("Good morning", "🌤️")
+        case 12..<17: return ("Good afternoon", "☀️")
+        case 17..<21: return ("Good evening", "🌅")
+        default: return ("Sweet dreams", "🌙")
+        }
+    }
+
+    private var dayLabel: String {
         if calendar.isDateInToday(day) { return "Today" }
         if calendar.isDateInYesterday(day) { return "Yesterday" }
         return day.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
     }
 
     var body: some View {
-        HStack {
-            Button { shift(-1) } label: {
-                Image(systemName: "chevron.left").frame(width: 44, height: 36)
-            }
-            Spacer()
-            VStack(spacing: 2) {
-                Text(label).font(.headline)
-                if !calendar.isDateInToday(day) {
-                    Button("Jump to today") { day = calendar.startOfDay(for: Date()) }
-                        .font(.caption)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(greeting.0) \(greeting.1)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.bark)
+                    Text(baby.name)
+                        .font(.system(size: 38, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Theme.canopy)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(baby.ageDescription)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
                 }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(colors: [Theme.lime.opacity(0.7), Theme.leaf.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: 76, height: 76)
+                    Text("🐵").font(.system(size: 44))
+                    Text("🌺").font(.system(size: 20)).offset(x: 28, y: -28)
+                }
+                .accessibilityHidden(true)
             }
-            Spacer()
-            Button { shift(1) } label: {
-                Image(systemName: "chevron.right").frame(width: 44, height: 36)
+
+            HStack {
+                Button { shift(-1) } label: {
+                    Image(systemName: "chevron.left.circle.fill").font(.title2)
+                }
+                .accessibilityLabel("Previous day")
+                Spacer()
+                VStack(spacing: 2) {
+                    Text(dayLabel).font(.headline)
+                    if !calendar.isDateInToday(day) {
+                        Button("Jump to today") { day = calendar.startOfDay(for: Date()) }
+                            .font(.caption.weight(.semibold))
+                    }
+                }
+                Spacer()
+                Button { shift(1) } label: {
+                    Image(systemName: "chevron.right.circle.fill").font(.title2)
+                }
+                .accessibilityLabel("Next day")
+                .disabled(calendar.isDateInToday(day))
             }
-            .disabled(calendar.isDateInToday(day))
+            .buttonStyle(.borderless)
+            .foregroundStyle(Theme.canopy)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Theme.card, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.leaf.opacity(0.18)))
         }
-        .buttonStyle(.borderless)
-        .padding(.vertical, 4)
+        .padding(.top, 4)
     }
 
     private func shift(_ days: Int) {
-        if let next = calendar.date(byAdding: .day, value: days, to: day) { day = next }
+        if let next = calendar.date(byAdding: .day, value: days, to: day) {
+            withAnimation(.snappy) { day = next }
+        }
     }
 }
 
@@ -138,24 +200,32 @@ struct SinceLastView: View {
         let lastBreast = entries.first { $0.kind == .feed && $0.breastLastSide != nil }
         let lastDiaper = entries.first { $0.kind == .diaper }
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            HStack(spacing: 0) {
-                stat(title: "Last feed", value: lastFeed.map { Units.ago($0.timestamp, now: context.date) } ?? "—", tint: Theme.feed)
-                Divider()
-                stat(title: "Next side", value: lastBreast?.breastLastSide.map { $0 == .left ? "Right" : "Left" } ?? "—", tint: Theme.feed)
-                Divider()
-                stat(title: "Last diaper", value: lastDiaper.map { Units.ago($0.timestamp, now: context.date) } ?? "—", tint: Theme.diaper)
+            HStack(spacing: 10) {
+                stat(animal: Theme.feedAnimal, title: "Last feed", value: lastFeed.map { Units.ago($0.timestamp, now: context.date) } ?? "—", tint: Theme.feed)
+                stat(animal: "🤱", title: "Next side", value: lastBreast?.breastLastSide.map { $0 == .left ? "Right" : "Left" } ?? "—", tint: Theme.mango)
+                stat(animal: Theme.diaperAnimal, title: "Last diaper", value: lastDiaper.map { Units.ago($0.timestamp, now: context.date) } ?? "—", tint: Theme.diaper)
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private func stat(title: String, value: String, tint: Color) -> some View {
+    private func stat(animal: String, title: String, value: String, tint: Color) -> some View {
         VStack(spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Text(value).font(.subheadline.weight(.semibold)).foregroundStyle(tint)
-                .lineLimit(1).minimumScaleFactor(0.7)
+            Text(animal).font(.title2)
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(title).font(.caption2.weight(.medium)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(LinearGradient(colors: [tint.opacity(0.2), tint.opacity(0.07)], startPoint: .top, endPoint: .bottom))
+        )
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -164,32 +234,32 @@ struct DailyReportGrid: View {
     let metric: Bool
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ReportTile(
-                title: "Feeds", value: "\(summary.feedCount)", symbol: "heart.fill", tint: Theme.feed,
+                title: "Feeds", value: "\(summary.feedCount)", animal: Theme.feedAnimal, tint: Theme.feed,
                 lines: feedLines
             )
             ReportTile(
-                title: "Diapers", value: "\(summary.diaperCount)", symbol: "humidity.fill", tint: Theme.diaper,
+                title: "Diapers", value: "\(summary.diaperCount)", animal: Theme.diaperAnimal, tint: Theme.diaper,
                 lines: ["\(summary.wetCount) wet · \(summary.dirtyCount) dirty"]
             )
             if summary.pumpCount > 0 {
                 ReportTile(
-                    title: "Pumped", value: Units.volume(summary.pumpedML, metric: metric), symbol: "drop.circle", tint: Theme.pump,
+                    title: "Pumped", value: Units.volume(summary.pumpedML, metric: metric), animal: Theme.pumpAnimal, tint: Theme.pump,
                     lines: ["\(summary.pumpCount) session\(summary.pumpCount == 1 ? "" : "s") · \(Units.duration(summary.pumpSeconds))"]
                 )
             }
             if summary.dropOff != nil || summary.pickUp != nil {
                 ReportTile(
-                    title: "Daycare", value: daycareValue, symbol: "building.2.fill", tint: Theme.daycare,
+                    title: "Daycare", value: daycareValue, animal: summary.pickUp != nil ? Theme.pickUpAnimal : Theme.daycareAnimal, tint: Theme.daycare,
                     lines: daycareLines
                 )
             }
             if let grams = summary.latestWeightGrams {
-                ReportTile(title: "Weight", value: Units.weight(grams, metric: metric), symbol: "scalemass.fill", tint: Theme.weight, lines: [])
+                ReportTile(title: "Weight", value: Units.weight(grams, metric: metric), animal: Theme.weightAnimal, tint: Theme.weight, lines: [])
             }
             ForEach(summary.milestones, id: \.self) { milestone in
-                ReportTile(title: "Milestone", value: milestone, symbol: "star.fill", tint: Theme.milestone, lines: [])
+                ReportTile(title: "Milestone", value: milestone, animal: Theme.milestoneAnimal, tint: Theme.milestone, lines: [])
             }
         }
     }
@@ -221,19 +291,20 @@ struct DailyReportGrid: View {
 struct ReportTile: View {
     let title: String
     let value: String
-    let symbol: String
+    let animal: String
     let tint: Color
     let lines: [String]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: symbol)
-                .font(.caption.weight(.semibold))
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption2.weight(.heavy))
+                .tracking(0.6)
                 .foregroundStyle(tint)
             Text(value)
-                .font(.title2.weight(.bold))
+                .font(.system(.title, design: .rounded).weight(.heavy))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
             ForEach(lines, id: \.self) { line in
                 Text(line)
                     .font(.caption)
@@ -241,31 +312,49 @@ struct ReportTile: View {
                     .lineLimit(2)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 86, alignment: .topLeading)
-        .padding(12)
-        .background(tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(maxWidth: .infinity, minHeight: 92, alignment: .topLeading)
+        .padding(14)
+        .background(alignment: .topTrailing) {
+            Text(animal)
+                .font(.system(size: 34))
+                .rotationEffect(.degrees(12))
+                .padding(8)
+                .opacity(0.9)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0.06)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        )
+        .background(Theme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(tint.opacity(0.25), lineWidth: 1))
+        .accessibilityElement(children: .combine)
     }
 }
 
 struct QuickAddGrid: View {
     let onSelect: (EntryTemplate) -> Void
+    @State private var tapped = 0
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 5), spacing: 14) {
+        HStack(spacing: 4) {
             ForEach(EntryTemplate.allCases) { template in
                 Button {
+                    tapped += 1
                     onSelect(template)
                 } label: {
                     VStack(spacing: 6) {
-                        IconBadge(symbol: template.symbol, tint: template.tint, size: 48)
+                        MascotBadge(animal: template.animal, tint: template.tint, size: 56)
+                            .shadow(color: template.tint.opacity(0.3), radius: 6, y: 3)
                         Text(template.label)
-                            .font(.caption)
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(BouncyButtonStyle())
             }
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: tapped)
     }
 }
 
@@ -275,10 +364,10 @@ struct EntryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            IconBadge(symbol: entry.symbol, tint: entry.tint)
+            MascotBadge(animal: entry.animal, tint: entry.tint)
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(entry.displayTitle).font(.body.weight(.semibold))
+                    Text(entry.displayTitle).font(.body.weight(.bold))
                     Spacer()
                     Text(entry.timestamp.formatted(date: .omitted, time: .shortened))
                         .font(.subheadline)

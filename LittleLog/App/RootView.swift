@@ -7,11 +7,11 @@ struct RootView: View {
     var body: some View {
         Group {
             if auth.isLoading {
-                ProgressView()
+                JungleLoading()
             } else if auth.user == nil {
                 SignInView()
             } else if !store.hasLoaded {
-                ProgressView("Loading…")
+                JungleLoading()
             } else if store.babies.isEmpty {
                 NavigationStack {
                     BabyFormView(mode: .create, isFirstBaby: true)
@@ -20,6 +20,8 @@ struct RootView: View {
                 MainTabView()
             }
         }
+        .tint(Theme.canopy)
+        .fontDesign(.rounded)
         .task(id: auth.user?.uid) {
             if let email = auth.email {
                 store.start(email: email)
@@ -40,15 +42,33 @@ struct MainTabView: View {
         if let baby = store.selectedBaby {
             TabView {
                 TodayView(baby: baby)
-                    .tabItem { Label("Today", systemImage: "list.bullet.rectangle.portrait") }
+                    .tabItem { Label("Today", systemImage: "sun.max.fill") }
                 TrendsView(baby: baby)
-                    .tabItem { Label("Trends", systemImage: "chart.bar.xaxis") }
+                    .tabItem { Label("Trends", systemImage: "chart.bar.fill") }
                 PhotosView(baby: baby)
-                    .tabItem { Label("Photos", systemImage: "photo.on.rectangle") }
+                    .tabItem { Label("Photos", systemImage: "camera.fill") }
                 FamilyView(baby: baby)
-                    .tabItem { Label("Family", systemImage: "person.2") }
+                    .tabItem { Label("Family", systemImage: "pawprint.fill") }
             }
         }
+    }
+}
+
+/// A monkey swinging gently while things load.
+struct JungleLoading: View {
+    @State private var swing = false
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("🐒")
+                .font(.system(size: 64))
+                .rotationEffect(.degrees(swing ? 12 : -12), anchor: .top)
+                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: swing)
+            ProgressView()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(JungleBackground())
+        .onAppear { swing = true }
     }
 }
 

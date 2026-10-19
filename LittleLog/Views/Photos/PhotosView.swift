@@ -11,7 +11,7 @@ struct PhotosView: View {
     @State private var uploadError: String?
     @State private var selected: BabyPhoto?
 
-    private let columns = [GridItem(.adaptive(minimum: 110), spacing: 2)]
+    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 8)]
 
     var body: some View {
         NavigationStack {
@@ -27,19 +27,28 @@ struct PhotosView: View {
                 if let uploadError {
                     Text(uploadError).font(.footnote).foregroundStyle(.red).padding(.horizontal)
                 }
-                LazyVGrid(columns: columns, spacing: 2) {
+                LazyVGrid(columns: columns, spacing: 8) {
                     ForEach(store.photos) { photo in
                         Button { selected = photo } label: {
                             PhotoThumbnail(url: URL(string: photo.thumbURL))
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.7), lineWidth: 2))
+                                .shadow(color: Theme.canopy.opacity(0.15), radius: 5, y: 3)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(BouncyButtonStyle())
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
             }
+            .background(JungleBackground())
             .overlay {
                 if store.hasLoaded && store.photos.isEmpty && uploadProgress == nil {
                     ContentUnavailableView {
-                        Label("No photos yet", systemImage: "photo.on.rectangle.angled")
+                        VStack(spacing: 8) {
+                            Text("🦒📸").font(.system(size: 56))
+                            Text("No photos yet").font(.title2.bold())
+                        }
                     } description: {
                         Text("Tap + to share photos of \(baby.name) with your family.")
                     }
@@ -50,7 +59,7 @@ struct PhotosView: View {
                 ToolbarItem(placement: .topBarLeading) { BabySwitcher() }
                 ToolbarItem(placement: .topBarTrailing) {
                     PhotosPicker(selection: $pickerItems, maxSelectionCount: 20, matching: .images) {
-                        Image(systemName: "plus")
+                        Image(systemName: "plus.circle.fill").font(.title2)
                     }
                     .disabled(uploadProgress != nil)
                 }

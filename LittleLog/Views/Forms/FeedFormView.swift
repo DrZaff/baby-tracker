@@ -53,7 +53,7 @@ struct FeedFormView: View {
 
             Section {
                 Toggle(isOn: $includeBreast.animation()) {
-                    Label("Breastfeeding", systemImage: "heart.fill").foregroundStyle(Theme.feed)
+                    Label { Text("Breastfeeding").fontWeight(.semibold) } icon: { Text(Theme.feedAnimal) }.foregroundStyle(Theme.feed)
                 }
                 .tint(Theme.feed)
                 if includeBreast {
@@ -66,7 +66,7 @@ struct FeedFormView: View {
 
             Section {
                 Toggle(isOn: $includeBottle.animation()) {
-                    Label("Bottle", systemImage: "drop.fill").foregroundStyle(Theme.bottle)
+                    Label { Text("Bottle").fontWeight(.semibold) } icon: { Text(Theme.bottleAnimal) }.foregroundStyle(Theme.bottle)
                 }
                 .tint(Theme.bottle)
                 if includeBottle {
@@ -80,7 +80,7 @@ struct FeedFormView: View {
 
             Section {
                 Toggle(isOn: $includePump.animation()) {
-                    Label("Pumping", systemImage: "drop.circle").foregroundStyle(Theme.pump)
+                    Label { Text("Pumping").fontWeight(.semibold) } icon: { Text(Theme.pumpAnimal) }.foregroundStyle(Theme.pump)
                 }
                 .tint(Theme.pump)
                 if includePump {

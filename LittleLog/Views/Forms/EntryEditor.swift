@@ -14,13 +14,13 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
         }
     }
 
-    var symbol: String {
+    var animal: String {
         switch self {
-        case .feed: return "heart.fill"
-        case .diaper: return "humidity.fill"
-        case .weight: return "scalemass.fill"
-        case .milestone: return "star.fill"
-        case .daycare: return "building.2.fill"
+        case .feed: return Theme.feedAnimal
+        case .diaper: return Theme.diaperAnimal
+        case .weight: return Theme.weightAnimal
+        case .milestone: return Theme.milestoneAnimal
+        case .daycare: return Theme.daycareAnimal
         }
     }
 
@@ -87,6 +87,7 @@ struct EntryFormToolbar: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            .jungleBackground()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

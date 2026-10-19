@@ -99,10 +99,12 @@ struct TrendsView: View {
 
                     ChartCard(
                         title: "Feeds", subtitle: perLabel, unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.feedAnimal,
                         points: points([("Feeds", { Double($0.feedCount) })])
                     )
                     ChartCard(
                         title: "Breastfeeding", subtitle: "minutes \(perLabel)", unit: bucketUnit, valueFormat: "%.0f",
+                        animal: "🤱",
                         points: points([
                             ("Left", { Double($0.breastLeftSeconds) / 60 }),
                             ("Right", { Double($0.breastRightSeconds) / 60 }),
@@ -110,6 +112,7 @@ struct TrendsView: View {
                     )
                     ChartCard(
                         title: "Bottle", subtitle: "\(volumeUnit) \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.bottleAnimal,
                         points: points([
                             ("Formula", { $0.formulaML * volumeScale }),
                             ("Breast milk", { $0.breastMilkML * volumeScale }),
@@ -117,10 +120,12 @@ struct TrendsView: View {
                     )
                     ChartCard(
                         title: "Pumped", subtitle: "\(volumeUnit) \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.pumpAnimal,
                         points: points([("Pumped", { $0.pumpedML * volumeScale })])
                     )
                     ChartCard(
                         title: "Diapers", subtitle: perLabel, unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.diaperAnimal,
                         points: points([
                             ("Wet", { Double($0.wetCount) }),
                             ("Dirty", { Double($0.dirtyCount) }),
@@ -130,7 +135,7 @@ struct TrendsView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(JungleBackground())
             .overlay {
                 if isLoading && entries.isEmpty { ProgressView() }
             }
@@ -161,6 +166,7 @@ struct ChartCard: View {
     let subtitle: String
     let unit: Calendar.Component
     let valueFormat: String
+    var animal: String = "🌿"
     let points: [TrendPoint]
 
     @State private var selectedDate: Date?
@@ -182,7 +188,7 @@ struct ChartCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(title).font(.headline)
+                Text("\(animal) \(title)").font(.headline).foregroundStyle(Theme.canopy)
                 Text(subtitle).font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if let first = selectedPoints.first {
@@ -224,8 +230,7 @@ struct ChartCard: View {
                     .frame(maxWidth: .infinity, minHeight: 60)
             }
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .jungleCard(padding: 16)
     }
 
     private var axisFormat: Date.FormatStyle {
@@ -266,7 +271,7 @@ struct WeightChart: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Weight").font(.headline)
+                Text("\(Theme.weightAnimal) Weight").font(.headline).foregroundStyle(Theme.canopy)
                 Text(metric ? "kg" : "lb").font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 if let entry = selected ?? sorted.last, let grams = entry.weightGrams {
@@ -308,8 +313,7 @@ struct WeightChart: View {
                 .frame(height: 160)
             }
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .jungleCard(padding: 16)
     }
 }
 

@@ -20,11 +20,15 @@ struct FamilyView: View {
             Form {
                 Section {
                     HStack(spacing: 14) {
-                        Text(String(baby.name.prefix(1)).uppercased())
-                            .font(.title.bold())
-                            .foregroundStyle(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Theme.feed.gradient, in: Circle())
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Theme.leaf, Theme.canopy], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            Text(String(baby.name.prefix(1)).uppercased())
+                                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.white)
+                            Text("🌺").font(.system(size: 20)).offset(x: 24, y: -24)
+                        }
+                        .frame(width: 64, height: 64)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(baby.name).font(.title3.bold())
                             Text(baby.ageDescription).foregroundStyle(.secondary)
@@ -68,12 +72,12 @@ struct FamilyView: View {
                         Label("Invite a caregiver", systemImage: "person.badge.plus")
                     }
                 } header: {
-                    Text("Caregivers")
+                    JungleHeader(title: "Caregivers", icon: "🐾")
                 } footer: {
                     Text("Anyone listed here can sign in with that Google account to see and log everything for \(baby.name), and gets a notification when something new is logged.")
                 }
 
-                Section("Babies") {
+                Section {
                     ForEach(store.babies) { other in
                         Button {
                             store.select(other)
@@ -92,15 +96,19 @@ struct FamilyView: View {
                     } label: {
                         Label("Add another baby", systemImage: "plus")
                     }
+                } header: {
+                    JungleHeader(title: "Babies", icon: "🐣")
                 }
 
-                Section("Settings") {
+                Section {
                     Toggle("Metric by default (ml, kg)", isOn: $useMetric)
                     Button("Notification settings") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
                     }
+                } header: {
+                    JungleHeader(title: "Settings", icon: "🌿")
                 }
 
                 Section {
@@ -115,6 +123,7 @@ struct FamilyView: View {
                     }
                 }
             }
+            .jungleBackground()
             .navigationTitle("Family")
             .sheet(isPresented: $editingBaby) {
                 NavigationStack { BabyFormView(mode: .edit(baby)) }
