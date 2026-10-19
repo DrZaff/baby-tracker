@@ -1,14 +1,19 @@
 # Little Log
 
-A shared baby tracker for iPhone. Everyone who cares for the baby signs in with Google, logs feeds, diapers, weight, milestones, daycare drop-offs and photos, and gets a notification when someone else logs something.
+A shared baby tracker for iPhone with a cute jungle theme. Everyone who cares for the baby signs in with Google, logs feeds, sleep, diapers, growth, milestones, daycare drop-offs and photos, and gets a notification when someone else logs something.
 
 ## What it does
 
 - **Today**: a daily report (feeds, breast time per side, bottle and pumped amounts, wet and dirty diapers, daycare times, weight), "last feed", "next side" and "last diaper" at a glance, one-tap logging, and a timeline you can scroll back day by day. Tap any entry to edit it, swipe to delete.
 - **Feeds**: breastfeeding with a left/right timer, bottle (formula or breast milk), pumping with per-side timers and amount, or any combination in one entry.
+- **Sleep**: start a sleep and tap Wake up later, or log one after the fact.
 - **Diapers**: pee, poop or both, with optional stool color and consistency.
-- **Weight, milestones, daycare** drop-off and pick-up.
-- **Trends**: week and month charts by day, a year view by month (daily averages), plus a growth chart.
+- **Growth**: weight, length and head size, with WHO percentiles (set boy or girl in the profile).
+- **Milestones** (with confetti), **daycare** drop-off and pick-up, and one-tap **repeat last bottle**.
+- **Trends**: week and month charts by day, a year view by month (daily averages), and a growth chart over the WHO percentile curves. **Doctor report** makes a PDF to share or print.
+- **Siri**: "Log a diaper in Little Log", "Log a bottle in Little Log", "Start a nap in Little Log", "Baby woke up in Little Log", "When was the last feed in Little Log".
+- **Widget and Live Activities**: last feed, next side and last diaper on the home or lock screen; running feed timers and sleep on the lock screen and in the Dynamic Island.
+- **Feed reminders**: notify everyone when it's been a set number of hours since the last feed (Family > Settings).
 - **Photos**: share photos with the family, add captions, save or share them.
 - **Family**: several babies, invite caregivers by their Google email, units (oz/lb or ml/kg).
 
@@ -48,7 +53,7 @@ The bundle ID used below is `com.drzaff.littlelog`. Use the same one everywhere.
 
    `firebase login` shows a link. Open it, sign in, and paste the code back. If deploy asks to grant Storage a role for cross-service rules, answer **Y**.
 
-Repeat this step whenever the files in `firebase/` change.
+Repeat this step whenever the files in `firebase/` change (feed reminders were added later, so if you deployed before them, run it again). If it asks to enable Cloud Scheduler, answer **Y**.
 
 ### 3. Apple: app ID, push key and app record
 
