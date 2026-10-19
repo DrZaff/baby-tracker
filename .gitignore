@@ -9,3 +9,5 @@ firebase/functions/node_modules/
 firebase/.firebase/
 firebase/.firebaserc
 LittleLog/LittleLog.entitlements
+LittleLogWidgets/Info.plist
+LittleLogWidgets/LittleLogWidgets.entitlements

@@ -22,6 +22,7 @@ targets:
     platform: iOS
     sources:
       - path: LittleLog
+      - path: Shared
     configFiles:
       Debug: Config.xcconfig
       Release: Config.xcconfig
@@ -48,6 +49,8 @@ targets:
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Choose photos of your baby to share with your family.
+        NSSupportsLiveActivities: true
+        LittleLogSharedKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
         CFBundleURLTypes:
           - CFBundleURLName: google-sign-in
             CFBundleURLSchemes: [$(REVERSED_CLIENT_ID)]
@@ -55,7 +58,12 @@ targets:
       path: LittleLog/LittleLog.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
+        # The app's own group comes first so sign-in stays in the default keychain group.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(APP_BUNDLE_ID)
+          - $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
     dependencies:
+      - target: LittleLogWidgets
       - package: Firebase
         product: FirebaseAuth
       - package: Firebase
@@ -66,3 +74,37 @@ targets:
         product: FirebaseMessaging
       - package: GoogleSignIn
         product: GoogleSignIn
+
+  LittleLogWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: LittleLogWidgets
+      - path: Shared
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).widgets
+        DEVELOPMENT_TEAM: $(APP_TEAM_ID)
+        CODE_SIGN_STYLE: $(APP_SIGN_STYLE)
+        CODE_SIGN_IDENTITY: $(APP_SIGN_IDENTITY)
+        "CODE_SIGN_IDENTITY[sdk=iphoneos*]": $(APP_SIGN_IDENTITY)
+        PROVISIONING_PROFILE_SPECIFIER: $(WIDGET_PROFILE)
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: true
+    info:
+      path: LittleLogWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Little Log
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LittleLogSharedKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: LittleLogWidgets/LittleLogWidgets.entitlements
+      properties:
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared

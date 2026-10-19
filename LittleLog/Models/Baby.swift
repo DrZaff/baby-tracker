@@ -17,6 +17,8 @@ struct Baby: Identifiable, Codable, Equatable {
     /// Lowercased Google account emails of everyone who can see and edit this baby's log.
     var memberEmails: [String]
     var createdAt: Date
+    /// Remind every caregiver when this many hours pass without a feed. Nil means off.
+    var feedReminderHours: Double?
 
     var babyID: String { id ?? "" }
 

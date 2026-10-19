@@ -59,6 +59,7 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$RUNNER_TEMP/signing/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          cp "$RUNNER_TEMP/signing/widget.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$WIDGET_PROFILE_UUID.mobileprovision"
 
       - name: Use the newest Xcode
         run: |
@@ -89,6 +90,7 @@ jobs:
             APP_SIGN_STYLE=Manual \
             APP_SIGN_IDENTITY="Apple Distribution" \
             APP_PROFILE="$PROFILE_NAME" \
+            WIDGET_PROFILE="$WIDGET_PROFILE_NAME" \
             APS_ENVIRONMENT=production \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             | tee archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)" || true
@@ -99,6 +101,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:$BUNDLE_ID string $PROFILE_NAME" ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:$BUNDLE_ID.widgets string $WIDGET_PROFILE_NAME" ExportOptions.plist
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/LittleLog.xcarchive" \
             -exportOptionsPlist ExportOptions.plist \

@@ -29,6 +29,8 @@ struct TrendsView: View {
     @AppStorage("useMetric") private var useMetric = false
     @State private var range: TrendRange = .week
     @State private var entries: [LogEntry] = []
+    @State private var growth: [LogEntry] = []
+    @State private var showingReport = false
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -131,7 +133,12 @@ struct TrendsView: View {
                             ("Dirty", { Double($0.dirtyCount) }),
                         ])
                     )
-                    WeightChart(entries: entries.filter { $0.kind == .weight && $0.weightGrams != nil }, metric: useMetric)
+                    ChartCard(
+                        title: "Sleep", subtitle: "hours \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.sleepAnimal,
+                        points: points([("Sleep", { Double($0.sleepSeconds) / 3600 })])
+                    )
+                    GrowthChart(entries: growth, baby: baby, metric: useMetric)
                 }
                 .padding()
             }
@@ -141,7 +148,15 @@ struct TrendsView: View {
             }
             .navigationTitle("Trends")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showingReport = true } label: {
+                        Label("Doctor report", systemImage: "doc.richtext")
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) { BabySwitcher() }
+            }
+            .sheet(isPresented: $showingReport) {
+                ReportView(baby: baby)
             }
             .task(id: "\(baby.babyID)|\(range.rawValue)") { await load() }
             .refreshable { await load() }
@@ -153,6 +168,7 @@ struct TrendsView: View {
         defer { isLoading = false }
         do {
             entries = try await EntryRepository.fetch(babyID: baby.babyID, from: rangeStart, to: Date().addingTimeInterval(60))
+            growth = try await EntryRepository.fetchGrowth(babyID: baby.babyID)
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -250,67 +266,170 @@ struct ChartCard: View {
     }
 }
 
-struct WeightChart: View {
+/// Weight, length or head size over time, drawn over the WHO percentile curves.
+struct GrowthChart: View {
     let entries: [LogEntry]
+    let baby: Baby
     let metric: Bool
 
+    @State private var measure: GrowthMeasure = .weight
     @State private var selectedDate: Date?
 
-    private func value(_ entry: LogEntry) -> Double {
-        let grams = entry.weightGrams ?? 0
-        return metric ? grams / 1000 : grams / Units.gramsPerPound
+    private static let curves: [(name: String, z: Double)] = [
+        ("3rd", -1.881), ("15th", -1.036), ("50th", 0), ("85th", 1.036), ("97th", 1.881),
+    ]
+
+    private struct Point: Identifiable {
+        let entry: LogEntry
+        let value: Double  // kg or cm
+        var id: String { entry.id ?? "\(entry.timestamp.timeIntervalSince1970)" }
     }
 
-    private var sorted: [LogEntry] { entries.sorted { $0.timestamp < $1.timestamp } }
+    private struct CurvePoint: Identifiable {
+        let name: String
+        let date: Date
+        let value: Double
+        var id: String { "\(name)-\(date.timeIntervalSince1970)" }
+    }
 
-    private var selected: LogEntry? {
+    private func standardValue(_ entry: LogEntry) -> Double? {
+        switch measure {
+        case .weight: return entry.weightGrams.map { $0 / 1000 }
+        case .length: return entry.lengthCm
+        case .head: return entry.headCm
+        }
+    }
+
+    /// kg or cm in the units being shown.
+    private func shown(_ value: Double) -> Double {
+        switch measure {
+        case .weight: return metric ? value : value * 1000 / Units.gramsPerPound
+        case .length, .head: return metric ? value : value / Units.cmPerInch
+        }
+    }
+
+    private func text(_ value: Double) -> String {
+        measure == .weight ? Units.weight(value * 1000, metric: metric) : Units.length(value, metric: metric)
+    }
+
+    private var unitLabel: String {
+        measure == .weight ? (metric ? "kg" : "lb") : (metric ? "cm" : "in")
+    }
+
+    private var points: [Point] {
+        entries
+            .sorted { $0.timestamp < $1.timestamp }
+            .compactMap { entry in standardValue(entry).map { Point(entry: entry, value: $0) } }
+    }
+
+    private var selected: Point? {
         guard let selectedDate else { return nil }
-        return sorted.min { abs($0.timestamp.timeIntervalSince(selectedDate)) < abs($1.timestamp.timeIntervalSince(selectedDate)) }
+        return points.min { abs($0.entry.timestamp.timeIntervalSince(selectedDate)) < abs($1.entry.timestamp.timeIntervalSince(selectedDate)) }
+    }
+
+    private var curvePoints: [CurvePoint] {
+        guard let sex = baby.sex else { return [] }
+        let start = baby.birthDate
+        let end = Date()
+        guard start < end else { return [] }
+        let step = max(1, (end.timeIntervalSince(start) / 86_400 / 40).rounded())
+        var result: [CurvePoint] = []
+        var date = start
+        while date <= end {
+            let age = GrowthStandards.ageDays(birthDate: baby.birthDate, on: date)
+            if let lms = GrowthStandards.lms(measure, sex: sex, ageDays: age) {
+                for curve in Self.curves {
+                    result.append(CurvePoint(name: curve.name, date: date, value: shown(lms.value(z: curve.z))))
+                }
+            }
+            date = date.addingTimeInterval(step * 86_400)
+        }
+        return result
+    }
+
+    private func percentileText(_ point: Point) -> String? {
+        guard let sex = baby.sex,
+              let p = GrowthStandards.percentile(measure, sex: sex, birthDate: baby.birthDate, on: point.entry.timestamp, value: point.value)
+        else { return nil }
+        return "\(GrowthStandards.ordinal(p)) percentile"
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(Theme.weightAnimal) Weight").font(.headline).foregroundStyle(Theme.canopy)
-                Text(metric ? "kg" : "lb").font(.caption).foregroundStyle(.secondary)
+                Text("\(Theme.weightAnimal) Growth").font(.headline).foregroundStyle(Theme.canopy)
+                Text(unitLabel).font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                if let entry = selected ?? sorted.last, let grams = entry.weightGrams {
-                    Text("\(entry.timestamp.formatted(.dateTime.month(.abbreviated).day())): \(Units.weight(grams, metric: metric))")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                }
             }
-            if let entry = selected ?? sorted.last, let index = sorted.firstIndex(of: entry), index > 0 {
-                HStack(spacing: 16) {
-                    WeightChange(title: "Since previous", from: sorted[index - 1].weightGrams, to: entry.weightGrams)
-                    if index > 1 {
-                        WeightChange(title: "Over this period", from: sorted[0].weightGrams, to: entry.weightGrams)
+            Picker("Measurement", selection: $measure) {
+                ForEach(GrowthMeasure.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+
+            let points = self.points
+            if let point = selected ?? points.last {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(text(point.value)).font(.system(.title2, design: .rounded).weight(.heavy))
+                        Text(point.entry.timestamp.formatted(.dateTime.month(.abbreviated).day().year()))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if let percentile = percentileText(point) {
+                        Text(percentile)
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Theme.weight.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Theme.weight)
+                    }
+                }
+                if let index = points.firstIndex(where: { $0.id == point.id }), index > 0 {
+                    HStack(spacing: 16) {
+                        WeightChange(title: "Since previous", from: points[index - 1].value, to: point.value)
+                        if index > 1 {
+                            WeightChange(title: "Since first", from: points[0].value, to: point.value)
+                        }
                     }
                 }
             }
-            if sorted.isEmpty {
-                Text("Log a weight to see growth over time.")
+
+            if points.isEmpty {
+                Text("Log a \(measure.label.lowercased()) to see growth over time.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 60)
             } else {
                 Chart {
-                    ForEach(sorted) { entry in
-                        LineMark(x: .value("Date", entry.timestamp), y: .value("Weight", value(entry)))
-                            .lineStyle(StrokeStyle(lineWidth: 2))
+                    ForEach(curvePoints) { curve in
+                        LineMark(x: .value("Date", curve.date), y: .value("WHO", curve.value), series: .value("Curve", curve.name))
+                            .lineStyle(StrokeStyle(lineWidth: curve.name == "50th" ? 1.5 : 1, dash: [4, 4]))
+                            .foregroundStyle(Color.secondary.opacity(curve.name == "50th" ? 0.6 : 0.35))
+                    }
+                    ForEach(points) { point in
+                        LineMark(x: .value("Date", point.entry.timestamp), y: .value(measure.label, shown(point.value)), series: .value("Curve", "Baby"))
+                            .lineStyle(StrokeStyle(lineWidth: 2.5))
                             .foregroundStyle(ChartPalette.first)
-                        PointMark(x: .value("Date", entry.timestamp), y: .value("Weight", value(entry)))
-                            .symbolSize(60)
+                        PointMark(x: .value("Date", point.entry.timestamp), y: .value(measure.label, shown(point.value)))
+                            .symbolSize(70)
                             .foregroundStyle(ChartPalette.first)
                     }
                     if let selected {
-                        RuleMark(x: .value("Selected", selected.timestamp))
+                        RuleMark(x: .value("Selected", selected.entry.timestamp))
                             .foregroundStyle(.secondary.opacity(0.4))
                     }
                 }
                 .chartYScale(domain: .automatic(includesZero: false))
                 .chartXSelection(value: $selectedDate)
-                .frame(height: 160)
+                .frame(height: 200)
+            }
+
+            if baby.sex == nil {
+                Text("Set boy or girl in \(baby.name)'s profile (Family tab) to compare with the WHO growth curves.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if !curvePoints.isEmpty {
+                Text("Dashed lines are the WHO 3rd, 15th, 50th, 85th and 97th percentiles.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
         .jungleCard(padding: 16)

@@ -50,6 +50,7 @@ struct MainTabView: View {
                 FamilyView(baby: baby)
                     .tabItem { Label("Family", systemImage: "pawprint.fill") }
             }
+            .celebratesMilestones()
         }
     }
 }

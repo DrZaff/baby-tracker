@@ -102,6 +102,17 @@ struct FamilyView: View {
 
                 Section {
                     Toggle("Metric by default (ml, kg)", isOn: $useMetric)
+                    Picker(selection: Binding(
+                        get: { baby.feedReminderHours ?? 0 },
+                        set: { store.setFeedReminder(hours: $0 > 0 ? $0 : nil, for: baby) }
+                    )) {
+                        Text("Off").tag(0.0)
+                        ForEach([2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0], id: \.self) { hours in
+                            Text(hours == hours.rounded() ? "After \(Int(hours)) hours" : "After \(String(format: "%.1f", hours)) hours").tag(hours)
+                        }
+                    } label: {
+                        Label { Text("Feed reminder") } icon: { Text("⏰") }
+                    }
                     Button("Notification settings") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -109,6 +120,8 @@ struct FamilyView: View {
                     }
                 } header: {
                     JungleHeader(title: "Settings", icon: "🌿")
+                } footer: {
+                    Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long.")
                 }
 
                 Section {

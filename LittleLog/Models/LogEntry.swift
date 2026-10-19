@@ -2,7 +2,7 @@ import Foundation
 import FirebaseFirestore
 
 enum EntryKind: String, Codable, CaseIterable {
-    case feed, diaper, weight, milestone, daycare
+    case feed, sleep, diaper, weight, milestone, daycare
 }
 
 enum BottleContent: String, Codable, CaseIterable, Identifiable {
@@ -22,8 +22,9 @@ enum BreastSide: String, Codable {
     var label: String { self == .left ? "Left" : "Right" }
 }
 
-/// One thing that happened: a feed (breast, bottle and/or pump), a diaper, a weight, a milestone or a daycare drop-off/pick-up.
-/// Stored at babies/{babyId}/entries/{entryId}. Volumes are millilitres and weights grams; the UI converts.
+/// One thing that happened: a feed (breast, bottle and/or pump), a sleep, a diaper, a growth check, a milestone
+/// or a daycare drop-off/pick-up. Stored at babies/{babyId}/entries/{entryId}.
+/// Volumes are millilitres, weights grams and lengths centimetres; the UI converts.
 struct LogEntry: Identifiable, Codable, Equatable {
     @DocumentID var id: String? = nil
     var kind: EntryKind
@@ -55,8 +56,13 @@ struct LogEntry: Identifiable, Codable, Equatable {
     var stoolColor: String?
     var stoolConsistency: String?
 
-    // Weight
+    // Sleep: timestamp is when it started. No end means the baby is still asleep.
+    var sleepEnd: Date?
+
+    // Growth (kind .weight): any of weight, length and head circumference.
     var weightGrams: Double?
+    var lengthCm: Double?
+    var headCm: Double?
 
     // Milestone
     var title: String?
@@ -82,6 +88,14 @@ extension LogEntry {
     /// A feed that fed the baby (pump-only sessions don't count).
     var isFeeding: Bool { kind == .feed && (hasBreast || hasBottle) }
     var isPumpOnly: Bool { kind == .feed && hasPump && !hasBreast && !hasBottle }
+    var isSleeping: Bool { kind == .sleep && sleepEnd == nil }
+
+    func sleepSeconds(now: Date = Date()) -> Int {
+        guard kind == .sleep else { return 0 }
+        return max(0, Int((sleepEnd ?? now).timeIntervalSince(timestamp)))
+    }
+
+    var measurementCount: Int { [weightGrams, lengthCm, headCm].compactMap { $0 }.count }
 
     var displayTitle: String {
         switch kind {
@@ -98,7 +112,12 @@ extension LogEntry {
             case (false, true): return "Poop"
             default: return "Pee"
             }
-        case .weight: return "Weight"
+        case .sleep: return isSleeping ? "Sleeping" : "Sleep"
+        case .weight:
+            if measurementCount > 1 { return "Growth check" }
+            if lengthCm != nil { return "Length" }
+            if headCm != nil { return "Head size" }
+            return "Weight"
         case .milestone: return title?.isEmpty == false ? title! : "Milestone"
         case .daycare: return daycareEvent?.label ?? "Daycare"
         }
@@ -130,8 +149,16 @@ extension LogEntry {
                 let stool = [stoolColor, stoolConsistency].compactMap { $0?.lowercased() }
                 if !stool.isEmpty { parts.append(stool.joined(separator: ", ")) }
             }
+        case .sleep:
+            if let end = sleepEnd {
+                parts.append("\(Units.duration(sleepSeconds())) · until \(end.formatted(date: .omitted, time: .shortened))")
+            } else {
+                parts.append("since \(timestamp.formatted(date: .omitted, time: .shortened))")
+            }
         case .weight:
             if let g = weightGrams { parts.append(Units.weight(g, metric: metric)) }
+            if let cm = lengthCm { parts.append("\(Units.length(cm, metric: metric)) long") }
+            if let cm = headCm { parts.append("head \(Units.length(cm, metric: metric))") }
         case .milestone:
             break
         case .daycare:
@@ -146,7 +173,8 @@ extension LogEntry {
         switch kind {
         case .feed: noun = isPumpOnly ? "a pump session" : "a feed"
         case .diaper: noun = "a diaper, \(displayTitle.lowercased())"
-        case .weight: noun = "a weight"
+        case .sleep: noun = isSleeping ? "the start of a sleep" : "a sleep"
+        case .weight: noun = measurementCount > 1 ? "a growth check" : "a \(displayTitle.lowercased())"
         case .milestone: noun = "a milestone: \(displayTitle)"
         case .daycare: noun = daycareEvent == .pickUp ? "a daycare pick-up" : "a daycare drop-off"
         }

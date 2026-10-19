@@ -1,6 +1,8 @@
 // Sends a push notification to every caregiver (except the person who made the
-// change) when an entry or photo is added or edited.
+// change) when an entry or photo is added or edited, and feed reminders when a
+// baby hasn't been fed for the time set in the app.
 const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
@@ -36,7 +38,8 @@ async function notifyCaregivers(babyId, actorUid, body) {
   const response = await getMessaging().sendEachForMulticast({
     tokens,
     notification: { title: baby.name || "Little Log", body },
-    apns: { payload: { aps: { sound: "default" } } },
+    // content-available lets the app refresh its home screen widget.
+    apns: { payload: { aps: { sound: "default", contentAvailable: true } } },
     data: { babyId },
   });
 
@@ -64,7 +67,13 @@ exports.onEntryWritten = onDocumentWritten("babies/{babyId}/entries/{entryId}", 
   const actorUid = isNew ? entry.createdByUid : entry.updatedByUid || entry.createdByUid;
   const actorName = isNew ? entry.createdByName : entry.updatedByName || entry.createdByName;
   const what = entry.summary || entry.kind;
-  const body = isNew ? `${actorName} logged ${what}` : `${actorName} edited ${what}`;
+  const before = isNew ? null : event.data.before.data();
+  let body = isNew ? `${actorName} logged ${what}` : `${actorName} edited ${what}`;
+  if (entry.kind === "sleep" && before && !before.sleepEnd && entry.sleepEnd) {
+    const minutes = Math.round((entry.sleepEnd.toMillis() - entry.timestamp.toMillis()) / 60000);
+    const slept = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
+    body = `${actorName} logged a wake-up after ${slept} of sleep`;
+  }
   await notifyCaregivers(event.params.babyId, actorUid, body);
 });
 
@@ -72,4 +81,30 @@ exports.onPhotoCreated = onDocumentCreated("babies/{babyId}/photos/{photoId}", a
   const photo = event.data && event.data.data();
   if (!photo) return;
   await notifyCaregivers(event.params.babyId, photo.createdByUid, `${photo.createdByName} shared a new photo`);
+});
+
+function isFeeding(entry) {
+  if (entry.kind !== "feed") return false;
+  const breast = (entry.breastLeftSeconds || 0) + (entry.breastRightSeconds || 0);
+  return breast > 0 || (entry.bottleML || 0) > 0;
+}
+
+// Every 10 minutes, remind caregivers of babies whose last feed is older than
+// their feed reminder setting. Each feed gets at most one reminder.
+exports.feedReminders = onSchedule("every 10 minutes", async () => {
+  const babies = await db.collection("babies").where("feedReminderHours", ">", 0).get();
+  const now = Date.now();
+  for (const babyDoc of babies.docs) {
+    const baby = babyDoc.data();
+    const recent = await babyDoc.ref.collection("entries").orderBy("timestamp", "desc").limit(40).get();
+    const lastFeed = recent.docs.find((d) => isFeeding(d.data()));
+    if (!lastFeed) continue;
+    const fedAt = lastFeed.get("timestamp").toMillis();
+    const hours = baby.feedReminderHours;
+    // Skip feeds older than a day so an unused log doesn't keep pinging.
+    if (now - fedAt < hours * 3600 * 1000 || now - fedAt > 24 * 3600 * 1000) continue;
+    if (baby.lastFeedReminderFor === lastFeed.id) continue;
+    await babyDoc.ref.update({ lastFeedReminderFor: lastFeed.id });
+    await notifyCaregivers(babyDoc.id, null, `⏰ It's been ${hours} hours since ${baby.name || "the baby"}'s last feed`);
+  }
 });

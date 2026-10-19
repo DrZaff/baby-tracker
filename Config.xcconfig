@@ -13,4 +13,5 @@ REVERSED_CLIENT_ID = com.googleusercontent.apps.77243092185-1eud0q6c8s74p7hnd9c4
 APP_SIGN_STYLE = Automatic
 APP_SIGN_IDENTITY = Apple Development
 APP_PROFILE =
+WIDGET_PROFILE =
 APS_ENVIRONMENT = development

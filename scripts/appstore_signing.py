@@ -3,12 +3,14 @@
 App Store Connect API key, so no Mac or Xcode account is needed.
 
 Each run:
-  1. makes sure the app's bundle ID is registered with push notifications on,
+  1. makes sure the app's bundle ID (with push notifications on) and the widget
+     extension's bundle ID (BUNDLE_ID + ".widgets") are registered,
   2. creates a fresh Apple Distribution certificate (revoking the oldest ones so
      the account never hits Apple's limit),
-  3. creates a matching App Store provisioning profile,
-and writes cert.p12 and the profile to OUT_DIR. PROFILE_NAME and PROFILE_UUID
-are appended to $GITHUB_ENV for the following workflow steps.
+  3. creates matching App Store provisioning profiles for both,
+and writes cert.p12, profile.mobileprovision and widget.mobileprovision to OUT_DIR.
+PROFILE_NAME, PROFILE_UUID, WIDGET_PROFILE_NAME and WIDGET_PROFILE_UUID are
+appended to $GITHUB_ENV for the following workflow steps.
 
 Env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH, BUNDLE_ID, OUT_DIR, P12_PASSWORD.
 """
@@ -30,6 +32,7 @@ from cryptography.x509.oid import NameOID
 
 API = "https://api.appstoreconnect.apple.com/v1"
 PROFILE_NAME = "LittleLog CI"
+WIDGET_PROFILE_NAME = "LittleLog Widgets CI"
 KEEP_CERTIFICATES = 1  # existing certificates kept besides the new one
 
 
@@ -69,7 +72,7 @@ def call(method, path, body=None, query=None):
         raise SystemExit(f"App Store Connect API {method} {path} failed ({error.code}): {detail}")
 
 
-def ensure_bundle_id(identifier):
+def ensure_bundle_id(identifier, name, push):
     found = call("GET", "/bundleIds", query={"filter[identifier]": identifier, "limit": 200})
     match = next((b for b in found["data"] if b["attributes"]["identifier"] == identifier), None)
     if match:
@@ -79,12 +82,14 @@ def ensure_bundle_id(identifier):
         created = call("POST", "/bundleIds", {
             "data": {
                 "type": "bundleIds",
-                "attributes": {"identifier": identifier, "name": "Little Log", "platform": "IOS"},
+                "attributes": {"identifier": identifier, "name": name, "platform": "IOS"},
             }
         })
         bundle_id = created["data"]["id"]
         print(f"Registered bundle ID {identifier}")
 
+    if not push:
+        return bundle_id
     capabilities = call("GET", f"/bundleIds/{bundle_id}/bundleIdCapabilities")
     if not any(c["attributes"]["capabilityType"] == "PUSH_NOTIFICATIONS" for c in capabilities["data"]):
         call("POST", "/bundleIdCapabilities", {
@@ -136,14 +141,14 @@ def create_certificate(out_dir, password):
     return created["data"]["id"]
 
 
-def create_profile(bundle_id, certificate_id, out_dir):
-    old = call("GET", "/profiles", query={"filter[name]": PROFILE_NAME, "limit": 200})["data"]
+def create_profile(name, bundle_id, certificate_id, path):
+    old = call("GET", "/profiles", query={"filter[name]": name, "limit": 200})["data"]
     for profile in old:
         call("DELETE", f"/profiles/{profile['id']}")
     created = call("POST", "/profiles", {
         "data": {
             "type": "profiles",
-            "attributes": {"name": PROFILE_NAME, "profileType": "IOS_APP_STORE"},
+            "attributes": {"name": name, "profileType": "IOS_APP_STORE"},
             "relationships": {
                 "bundleId": {"data": {"type": "bundleIds", "id": bundle_id}},
                 "certificates": {"data": [{"type": "certificates", "id": certificate_id}]},
@@ -151,22 +156,26 @@ def create_profile(bundle_id, certificate_id, out_dir):
         }
     })
     attributes = created["data"]["attributes"]
-    with open(os.path.join(out_dir, "profile.mobileprovision"), "wb") as f:
+    with open(path, "wb") as f:
         f.write(base64.b64decode(attributes["profileContent"]))
-    print(f"Created provisioning profile {PROFILE_NAME}")
+    print(f"Created provisioning profile {name}")
     return attributes["uuid"]
 
 
 def main():
     out_dir = env("OUT_DIR")
     os.makedirs(out_dir, exist_ok=True)
-    bundle_id = ensure_bundle_id(env("BUNDLE_ID"))
+    app_bundle = env("BUNDLE_ID")
+    app_id = ensure_bundle_id(app_bundle, "Little Log", push=True)
+    widget_id = ensure_bundle_id(app_bundle + ".widgets", "Little Log Widgets", push=False)
     certificate_id = create_certificate(out_dir, env("P12_PASSWORD"))
-    uuid = create_profile(bundle_id, certificate_id, out_dir)
+    uuid = create_profile(PROFILE_NAME, app_id, certificate_id, os.path.join(out_dir, "profile.mobileprovision"))
+    widget_uuid = create_profile(WIDGET_PROFILE_NAME, widget_id, certificate_id, os.path.join(out_dir, "widget.mobileprovision"))
     github_env = os.environ.get("GITHUB_ENV")
     if github_env:
         with open(github_env, "a") as f:
             f.write(f"PROFILE_NAME={PROFILE_NAME}\nPROFILE_UUID={uuid}\n")
+            f.write(f"WIDGET_PROFILE_NAME={WIDGET_PROFILE_NAME}\nWIDGET_PROFILE_UUID={widget_uuid}\n")
 
 
 if __name__ == "__main__":

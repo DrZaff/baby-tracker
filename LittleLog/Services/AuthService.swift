@@ -61,6 +61,7 @@ final class AuthService {
     func signOut() async {
         await PushNotifications.shared.removeCurrentToken()
         GIDSignIn.sharedInstance.signOut()
+        WidgetSnapshot.clear()
         do {
             try Auth.auth().signOut()
         } catch {

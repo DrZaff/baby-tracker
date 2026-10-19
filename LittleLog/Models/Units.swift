@@ -33,11 +33,35 @@ enum Units {
         return (lb, ((totalOz - Double(lb) * 16) * 10).rounded() / 10)
     }
 
+    static let cmPerInch = 2.54
+
+    static func length(_ cm: Double, metric: Bool) -> String {
+        metric ? "\(trimmed(cm)) cm" : "\(trimmed(cm / cmPerInch)) in"
+    }
+
+    /// Value shown in a length field for the chosen unit.
+    static func lengthValue(_ cm: Double, metric: Bool) -> Double {
+        ((metric ? cm : cm / cmPerInch) * 10).rounded() / 10
+    }
+
+    static func centimetres(from value: Double, metric: Bool) -> Double {
+        metric ? value : value * cmPerInch
+    }
+
     static func duration(_ seconds: Int) -> String {
         if seconds < 60 { return "\(seconds)s" }
         let minutes = Int((Double(seconds) / 60).rounded())
         if minutes < 60 { return "\(minutes)m" }
         return "\(minutes / 60)h \(minutes % 60)m"
+    }
+
+    /// "2 hours 10 minutes", for Siri to read out.
+    static func spoken(_ seconds: Int) -> String {
+        let minutes = max(0, seconds / 60)
+        let hours = minutes / 60, rest = minutes % 60
+        func plural(_ n: Int, _ unit: String) -> String { "\(n) \(unit)\(n == 1 ? "" : "s")" }
+        if hours == 0 { return minutes == 0 ? "less than a minute" : plural(minutes, "minute") }
+        return rest == 0 ? plural(hours, "hour") : "\(plural(hours, "hour")) \(plural(rest, "minute"))"
     }
 
     static func clock(_ interval: TimeInterval) -> String {

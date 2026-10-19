@@ -72,6 +72,12 @@ final class BabyStore {
         ])
     }
 
+    func setFeedReminder(hours: Double?, for baby: Baby) {
+        db.collection("babies").document(baby.babyID).updateData([
+            "feedReminderHours": hours ?? NSNull(),
+        ])
+    }
+
     func addCaregiver(email: String, to baby: Baby) {
         let cleaned = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !cleaned.isEmpty else { return }

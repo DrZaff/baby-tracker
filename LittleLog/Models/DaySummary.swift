@@ -16,12 +16,16 @@ struct DaySummary {
     var dropOff: Date?
     var pickUp: Date?
     var latestWeightGrams: Double?
+    var latestLengthCm: Double?
+    var latestHeadCm: Double?
+    var sleepCount = 0
+    var sleepSeconds = 0
     var milestones: [String] = []
 
     var breastSeconds: Int { breastLeftSeconds + breastRightSeconds }
     var bottleML: Double { formulaML + breastMilkML }
 
-    init(entries: [LogEntry]) {
+    init(entries: [LogEntry], now: Date = Date()) {
         for entry in entries.sorted(by: { $0.timestamp < $1.timestamp }) {
             switch entry.kind {
             case .feed:
@@ -40,8 +44,13 @@ struct DaySummary {
                 diaperCount += 1
                 if entry.wet == true { wetCount += 1 }
                 if entry.dirty == true { dirtyCount += 1 }
+            case .sleep:
+                sleepCount += 1
+                sleepSeconds += entry.sleepSeconds(now: now)
             case .weight:
                 latestWeightGrams = entry.weightGrams ?? latestWeightGrams
+                latestLengthCm = entry.lengthCm ?? latestLengthCm
+                latestHeadCm = entry.headCm ?? latestHeadCm
             case .milestone:
                 milestones.append(entry.displayTitle)
             case .daycare:

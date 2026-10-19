@@ -61,5 +61,8 @@ struct MilestoneFormView: View {
         entry.title = title.trimmedOrNil
         entry.notes = notes.trimmedOrNil
         try EntryRepository.save(entry, babyID: babyID, auth: auth, metric: useMetric)
+        if existing == nil {
+            NotificationCenter.default.post(name: .milestoneLogged, object: nil)
+        }
     }
 }

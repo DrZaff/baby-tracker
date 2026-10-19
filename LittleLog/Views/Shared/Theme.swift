@@ -13,6 +13,7 @@ enum Theme {
     static let orchid = dynamic(light: 0x9B6BD3, dark: 0xB592E6)
     static let lagoon = dynamic(light: 0x23A6A6, dark: 0x4CC9C4)
     static let river = dynamic(light: 0x3F7FD0, dark: 0x6FA2E8)
+    static let dusk = dynamic(light: 0x5B5FC7, dark: 0x9A9DF0)
     static let bark = dynamic(light: 0x6B4A2E, dark: 0xD9B98F)
 
     /// Page background: warm sand by day, deep jungle by night.
@@ -27,6 +28,7 @@ enum Theme {
     static let feed = hibiscus
     static let bottle = mango
     static let pump = orchid
+    static let sleep = dusk
     static let diaper = lagoon
     static let weight = river
     static let milestone = sunshine
@@ -36,6 +38,7 @@ enum Theme {
     static let feedAnimal = "🐘"
     static let bottleAnimal = "🦒"
     static let pumpAnimal = "🦩"
+    static let sleepAnimal = "🐨"
     static let diaperAnimal = "🐒"
     static let weightAnimal = "🦛"
     static let milestoneAnimal = "🦁"
@@ -62,6 +65,7 @@ extension LogEntry {
     var animal: String {
         switch kind {
         case .feed: return isPumpOnly ? Theme.pumpAnimal : (hasBreast ? Theme.feedAnimal : Theme.bottleAnimal)
+        case .sleep: return Theme.sleepAnimal
         case .diaper: return Theme.diaperAnimal
         case .weight: return Theme.weightAnimal
         case .milestone: return Theme.milestoneAnimal
@@ -72,6 +76,7 @@ extension LogEntry {
     var tint: Color {
         switch kind {
         case .feed: return isPumpOnly ? Theme.pump : (hasBreast ? Theme.feed : Theme.bottle)
+        case .sleep: return Theme.sleep
         case .diaper: return Theme.diaper
         case .weight: return Theme.weight
         case .milestone: return Theme.milestone

@@ -34,6 +34,16 @@ enum EntryRepository {
             .getDocuments()
         return snapshot.documents.compactMap { try? $0.data(as: LogEntry.self) }
     }
+
+    /// Every weight, length and head size ever logged, oldest first.
+    static func fetchGrowth(babyID: String) async throws -> [LogEntry] {
+        let snapshot = try await entries(for: babyID)
+            .whereField("kind", isEqualTo: EntryKind.weight.rawValue)
+            .getDocuments()
+        return snapshot.documents
+            .compactMap { try? $0.data(as: LogEntry.self) }
+            .sorted { $0.timestamp < $1.timestamp }
+    }
 }
 
 /// Live list of a baby's entries within a time window, newest first.

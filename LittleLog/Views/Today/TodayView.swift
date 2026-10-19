@@ -4,7 +4,9 @@ import Combine
 struct TodayView: View {
     let baby: Baby
 
+    @Environment(AuthService.self) private var auth
     @AppStorage("useMetric") private var useMetric = false
+    @State private var justLogged: String?
     @State private var day = Calendar.current.startOfDay(for: Date())
     @State private var dayEntries = EntriesListener()
     @State private var recent = EntriesListener()
@@ -23,6 +25,14 @@ struct TodayView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
 
+                if let sleep = recent.entries.first(where: { $0.isSleeping }) {
+                    Section {
+                        SleepingBanner(entry: sleep) { wakeUp(sleep) }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                }
+
                 if isToday {
                     Section {
                         SinceLastView(entries: recent.entries)
@@ -34,13 +44,16 @@ struct TodayView: View {
                 Section {
                     QuickAddGrid { template in sheet = .new(template) }
                         .padding(.vertical, 6)
+                    if isToday, let bottle = recent.entries.first(where: { $0.hasBottle }) {
+                        RepeatBottleButton(entry: bottle, justLogged: justLogged) { repeatBottle(bottle) }
+                    }
                 } header: {
                     JungleHeader(title: "Log something", icon: "🐾")
                 }
                 .listRowBackground(Theme.card)
 
                 Section {
-                    DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric)
+                    DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric, baby: baby, day: day)
                 } header: {
                     JungleHeader(title: isToday ? "Today's report" : "Daily report", icon: "🌿")
                 }
@@ -91,6 +104,14 @@ struct TodayView: View {
             .task(id: "\(baby.babyID)|\(day.timeIntervalSince1970)") {
                 dayEntries.listen(babyID: baby.babyID, from: day, to: dayEnd)
             }
+            .onChange(of: recent.entries) { _, entries in
+                WidgetSnapshot.publish(babyName: baby.name, entries: entries)
+                if let sleep = entries.first(where: { $0.isSleeping }) {
+                    LiveActivities.shared.showSleep(since: sleep.timestamp)
+                } else {
+                    LiveActivities.shared.endSleep()
+                }
+            }
             .task(id: baby.babyID) {
                 let since = calendar.date(byAdding: .day, value: -3, to: Date()) ?? Date()
                 recent.listen(babyID: baby.babyID, from: since)
@@ -102,6 +123,23 @@ struct TodayView: View {
                 }
             }
         }
+    }
+
+    private func wakeUp(_ sleep: LogEntry) {
+        var entry = sleep
+        entry.sleepEnd = Date()
+        try? EntryRepository.save(entry, babyID: baby.babyID, auth: auth, metric: useMetric)
+        LiveActivities.shared.endSleep()
+    }
+
+    /// Logs another bottle like the last one, right now.
+    private func repeatBottle(_ bottle: LogEntry) {
+        var entry = LogEntry(kind: .feed, createdByUid: auth.uid, createdByName: auth.displayName)
+        entry.bottleML = bottle.bottleML
+        entry.bottleContent = bottle.bottleContent
+        entry.metric = bottle.metric
+        try? EntryRepository.save(entry, babyID: baby.babyID, auth: auth, metric: bottle.metric ?? useMetric)
+        justLogged = UUID().uuidString
     }
 }
 
@@ -232,6 +270,8 @@ struct SinceLastView: View {
 struct DailyReportGrid: View {
     let summary: DaySummary
     let metric: Bool
+    let baby: Baby
+    let day: Date
 
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
@@ -243,6 +283,12 @@ struct DailyReportGrid: View {
                 title: "Diapers", value: "\(summary.diaperCount)", animal: Theme.diaperAnimal, tint: Theme.diaper,
                 lines: ["\(summary.wetCount) wet · \(summary.dirtyCount) dirty"]
             )
+            if summary.sleepCount > 0 {
+                ReportTile(
+                    title: "Sleep", value: Units.duration(summary.sleepSeconds), animal: Theme.sleepAnimal, tint: Theme.sleep,
+                    lines: ["\(summary.sleepCount) sleep\(summary.sleepCount == 1 ? "" : "s")"]
+                )
+            }
             if summary.pumpCount > 0 {
                 ReportTile(
                     title: "Pumped", value: Units.volume(summary.pumpedML, metric: metric), animal: Theme.pumpAnimal, tint: Theme.pump,
@@ -256,12 +302,28 @@ struct DailyReportGrid: View {
                 )
             }
             if let grams = summary.latestWeightGrams {
-                ReportTile(title: "Weight", value: Units.weight(grams, metric: metric), animal: Theme.weightAnimal, tint: Theme.weight, lines: [])
+                ReportTile(title: "Weight", value: Units.weight(grams, metric: metric), animal: Theme.weightAnimal, tint: Theme.weight,
+                           lines: percentileLine(.weight, grams / 1000))
+            }
+            if let cm = summary.latestLengthCm {
+                ReportTile(title: "Length", value: Units.length(cm, metric: metric), animal: "🦒", tint: Theme.weight,
+                           lines: percentileLine(.length, cm))
+            }
+            if let cm = summary.latestHeadCm {
+                ReportTile(title: "Head size", value: Units.length(cm, metric: metric), animal: "🐣", tint: Theme.weight,
+                           lines: percentileLine(.head, cm))
             }
             ForEach(summary.milestones, id: \.self) { milestone in
                 ReportTile(title: "Milestone", value: milestone, animal: Theme.milestoneAnimal, tint: Theme.milestone, lines: [])
             }
         }
+    }
+
+    private func percentileLine(_ measure: GrowthMeasure, _ value: Double) -> [String] {
+        guard let sex = baby.sex,
+              let p = GrowthStandards.percentile(measure, sex: sex, birthDate: baby.birthDate, on: day, value: value)
+        else { return [] }
+        return ["\(GrowthStandards.ordinal(p)) percentile"]
     }
 
     private var feedLines: [String] {
@@ -336,7 +398,7 @@ struct QuickAddGrid: View {
     @State private var tapped = 0
 
     var body: some View {
-        HStack(spacing: 4) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 14) {
             ForEach(EntryTemplate.allCases) { template in
                 Button {
                     tapped += 1
@@ -387,5 +449,85 @@ struct EntryRow: View {
         }
         .contentShape(Rectangle())
         .padding(.vertical, 2)
+    }
+}
+
+/// Shown while the baby is asleep, with a big Wake up button.
+struct SleepingBanner: View {
+    let entry: LogEntry
+    let wakeUp: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Text(Theme.sleepAnimal).font(.system(size: 40))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sleeping").font(.caption.weight(.heavy)).foregroundStyle(.white.opacity(0.85))
+                Text(timerInterval: entry.timestamp...Date.distantFuture, countsDown: false)
+                    .font(.system(.title, design: .rounded).weight(.heavy).monospacedDigit())
+                    .foregroundStyle(.white)
+                Text("since \(entry.timestamp.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption).foregroundStyle(.white.opacity(0.85))
+            }
+            Spacer()
+            Button(action: wakeUp) {
+                Text("Wake up ☀️")
+                    .font(.subheadline.weight(.bold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(.white, in: Capsule())
+                    .foregroundStyle(Theme.sleep)
+            }
+            .buttonStyle(BouncyButtonStyle())
+        }
+        .padding(16)
+        .background(
+            LinearGradient(colors: [Theme.sleep, Theme.orchid], startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay(alignment: .topTrailing) {
+            Text("✨").padding(8).accessibilityHidden(true)
+        }
+    }
+}
+
+/// One tap to log the same bottle again.
+struct RepeatBottleButton: View {
+    let entry: LogEntry
+    let justLogged: String?
+    let action: () -> Void
+
+    @AppStorage("useMetric") private var useMetric = false
+    @State private var confirmed = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Text(Theme.bottleAnimal).font(.title3)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(confirmed ? "Logged!" : "Repeat last bottle").font(.subheadline.weight(.bold))
+                    Text(description).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: confirmed ? "checkmark.circle.fill" : "arrow.counterclockwise.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Theme.bottle)
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .padding(.vertical, 4)
+        }
+        .buttonStyle(BouncyButtonStyle())
+        .sensoryFeedback(.success, trigger: justLogged)
+        .onChange(of: justLogged) {
+            withAnimation { confirmed = true }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                withAnimation { confirmed = false }
+            }
+        }
+    }
+
+    private var description: String {
+        let amount = entry.bottleML.map { Units.volume($0, metric: entry.metric ?? useMetric) } ?? ""
+        return "\(amount) \((entry.bottleContent ?? .formula).label.lowercased()) · now"
     }
 }

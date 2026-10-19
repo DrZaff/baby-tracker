@@ -99,10 +99,30 @@ struct FeedFormView: View {
             }
         }
         .entryFormToolbar(existing == nil ? "Log feed" : "Edit feed", canSave: hasContent, save: save)
+        .onChange(of: [breastLeft, breastRight, pumpLeft, pumpRight]) { updateLiveActivity() }
+        .onDisappear { LiveActivities.shared.endFeedTimer() }
         .onChange(of: metric) { old, new in
             // Keep the same amount when switching units.
             bottleAmount = bottleAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
             pumpedAmount = pumpedAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
+        }
+    }
+
+    /// Shows the running timer on the lock screen and in the Dynamic Island.
+    private func updateLiveActivity() {
+        let timers: [(SideTimer, String, String, UInt32)] = [
+            (breastLeft, "Breastfeeding · Left", Theme.feedAnimal, 0xE8566C),
+            (breastRight, "Breastfeeding · Right", Theme.feedAnimal, 0xE8566C),
+            (pumpLeft, "Pumping · Left", Theme.pumpAnimal, 0x9B6BD3),
+            (pumpRight, "Pumping · Right", Theme.pumpAnimal, 0x9B6BD3),
+        ]
+        if let (timer, title, animal, color) = timers.first(where: { $0.0.isRunning }) {
+            LiveActivities.shared.showFeedTimer(
+                title: title, animal: animal, color: color,
+                startedAt: Date().addingTimeInterval(-timer.elapsed())
+            )
+        } else {
+            LiveActivities.shared.endFeedTimer()
         }
     }
 
