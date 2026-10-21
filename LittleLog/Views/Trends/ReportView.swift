@@ -151,7 +151,9 @@ struct PDFPreview: UIViewRepresentable {
         context.coordinator.shown = version
         let document = PDFDocument(url: url)
         view.document = document
-        if page > 0, let target = document?.page(at: page) { view.go(to: target) }
+        if page > 0, let target = document?.page(at: page) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { view.go(to: target) }
+        }
     }
 }
 

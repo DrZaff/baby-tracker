@@ -5,6 +5,11 @@ name: Screenshots
 # Download them from the run's "screenshots" artifact.
 on:
   workflow_dispatch:
+    inputs:
+      screens:
+        description: Only these screens, in light mode (space separated). Leave empty for all.
+        required: false
+        default: ""
 
 jobs:
   screenshots:
@@ -40,6 +45,8 @@ jobs:
 
       - name: Take screenshots
         timeout-minutes: 45
+        env:
+          ONLY: ${{ inputs.screens }}
         run: |
           brew install coreutils > /dev/null
           t() { gtimeout "$@" || echo "  (timed out or failed: $*)"; }
@@ -81,6 +88,12 @@ jobs:
             # The first launch after installing is slow; warm up before taking pictures.
             t 60 xcrun simctl launch "$udid" "$BUNDLE" -designPreview -screen today > /dev/null
             sleep 20
+            if [ -n "$ONLY" ]; then
+              for s in $ONLY; do shoot "$s" light; done
+              t 60 xcrun simctl shutdown "$udid"
+              echo "::endgroup::"
+              continue
+            fi
             for s in $screens; do shoot "$s" light; done
             t 30 xcrun simctl ui "$udid" appearance dark
             for s in today today-report trends feed appointments; do shoot "$s" dark; done
