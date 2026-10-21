@@ -39,11 +39,17 @@ jobs:
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Take screenshots
+        timeout-minutes: 30
         run: |
+          brew install coreutils > /dev/null
+          t() { gtimeout "$@" || echo "  (timed out or failed: $*)"; }
           APP=build/Build/Products/Debug-iphonesimulator/LittleLog.app
           BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
           mkdir -p shots
-          devices=$(xcrun simctl list devices available | grep -E "^\s+iPhone" | sed -E 's/^ +//; s/ \(([0-9A-F-]{36})\).*/|\1/')
+          # Simulators for the newest installed iOS runtime only.
+          runtime=$(xcrun simctl list runtimes available | grep -E "^iOS" | tail -1 | sed -E 's/.* - (com\.apple[^ ]+).*/\1/')
+          echo "Runtime: $runtime"
+          devices=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices'].get('$runtime',[]); print('\n'.join(x['name']+'|'+x['udid'] for x in d if x['name'].startswith('iPhone')))")
           echo "$devices"
           big=$(echo "$devices" | grep -E "Pro Max" | tail -1)
           small=$(echo "$devices" | grep -E "iPhone (SE|1[0-9]e|1[0-9] mini)" | tail -1)
@@ -53,29 +59,34 @@ jobs:
             name=$(echo "${pick%%|*}" | tr ' ' '-')
             udid="${pick##*|}"
             [ -z "$udid" ] && continue
-            echo "Using $name ($udid)"
-            xcrun simctl boot "$udid" || true
-            xcrun simctl bootstatus "$udid" -b
-            xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
-            xcrun simctl install "$udid" "$APP"
+            echo "::group::$name"
+            date; echo "Booting"
+            t 300 xcrun simctl boot "$udid"
+            t 300 xcrun simctl bootstatus "$udid"
+            date; echo "Booted"
+            t 30 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+            t 120 xcrun simctl install "$udid" "$APP"
             shoot() {
-              xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" -designPreview -screen "$1" > /dev/null
-              sleep 6
-              xcrun simctl io "$udid" screenshot "shots/$name-$2-$1.png" > /dev/null 2>&1
+              echo "  $2 $1"
+              t 30 xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" -designPreview -screen "$1" > /dev/null
+              sleep 5
+              t 30 xcrun simctl io "$udid" screenshot "shots/$name-$2-$1.png" > /dev/null 2>&1
             }
-            xcrun simctl ui "$udid" appearance light
+            t 30 xcrun simctl ui "$udid" appearance light
             for s in $screens; do shoot "$s" light; done
-            xcrun simctl ui "$udid" appearance dark
+            t 30 xcrun simctl ui "$udid" appearance dark
             for s in today trends feed appointments; do shoot "$s" dark; done
-            xcrun simctl ui "$udid" appearance light
-            xcrun simctl ui "$udid" content_size extra-extra-large
+            t 30 xcrun simctl ui "$udid" appearance light
+            t 30 xcrun simctl ui "$udid" content_size extra-extra-large
             for s in today feed appointments; do shoot "$s" bigtext; done
-            xcrun simctl ui "$udid" content_size large
-            xcrun simctl shutdown "$udid"
+            t 30 xcrun simctl ui "$udid" content_size large
+            t 60 xcrun simctl shutdown "$udid"
+            echo "::endgroup::"
           done
           ls shots
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: screenshots
           path: shots
