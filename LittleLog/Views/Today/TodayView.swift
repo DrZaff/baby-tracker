@@ -407,8 +407,9 @@ struct ReportTile: View {
                 .foregroundStyle(tint)
             Text(value)
                 .font(.system(.title, design: .rounded).weight(.heavy))
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .lineLimit(2)
+                .minimumScaleFactor(0.6)
+                .padding(.trailing, 28)
             ForEach(lines, id: \.self) { line in
                 Text(line)
                     .font(.caption)
