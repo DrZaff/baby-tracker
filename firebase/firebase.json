@@ -6,6 +6,9 @@
   "hosting": {
     "public": "public",
     "cleanUrls": true,
+    "rewrites": [
+      { "source": "/cal/**", "function": { "functionId": "calendarFeed", "region": "us-central1" } }
+    ],
     "ignore": ["firebase.json", "**/.*"]
   },
   "storage": {

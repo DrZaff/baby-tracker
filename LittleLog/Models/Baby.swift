@@ -23,6 +23,8 @@ struct Baby: Identifiable, Codable, Equatable {
     var vitaminDReminder: Bool?
     /// When the vitamin D reminder was turned on, so adherence only counts from then.
     var vitaminDSince: Date?
+    /// Secret part of the appointments calendar feed link (see AppLinks.calendarFeed).
+    var calendarKey: String?
 
     var babyID: String { id ?? "" }
 

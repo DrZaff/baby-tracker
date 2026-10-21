@@ -120,3 +120,102 @@ exports.feedReminders = onSchedule("every 10 minutes", async () => {
     await notifyCaregivers(babyDoc.id, null, `⏰ It's been ${hours} hours since ${baby.name || "the baby"}'s last feed`);
   }
 });
+
+// A calendar feed of a baby's appointments that caregivers subscribe to once in
+// Apple or Google Calendar: https://little-log-be12c.web.app/cal/{babyId}/{key}.ics
+// The key is a random secret stored on the baby (calendarKey), created by the app.
+const { onRequest } = require("firebase-functions/v2/https");
+
+function icsText(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/([,;])/g, "\\$1");
+}
+
+function icsDate(date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+// Lines longer than 75 bytes are folded, as the calendar format requires.
+function fold(line) {
+  const parts = [];
+  let rest = line;
+  while (Buffer.byteLength(rest) > 74) {
+    let cut = 74;
+    while (Buffer.byteLength(rest.slice(0, cut)) > 74) cut--;
+    parts.push(rest.slice(0, cut));
+    rest = " " + rest.slice(cut);
+  }
+  parts.push(rest);
+  return parts.join("\r\n");
+}
+
+const kindLabels = {
+  wellChild: "Well-child check", lactation: "Lactation specialist", vaccines: "Vaccines",
+  sick: "Sick visit", specialist: "Specialist", dentist: "Dentist", other: "Appointment",
+};
+
+exports.calendarFeed = onRequest(async (req, res) => {
+  const match = req.path.match(/\/cal\/([^/]+)\/([^/.]+)(\.ics)?$/);
+  if (!match) {
+    res.status(404).send("Not found");
+    return;
+  }
+  const [, babyId, key] = match;
+  const babySnap = await db.doc(`babies/${babyId}`).get();
+  const baby = babySnap.exists ? babySnap.data() : null;
+  if (!baby || !baby.calendarKey || baby.calendarKey !== key) {
+    res.status(404).send("Not found");
+    return;
+  }
+
+  const since = new Date(Date.now() - 365 * 24 * 3600 * 1000);
+  const snap = await db.collection(`babies/${babyId}/appointments`).where("start", ">=", since).get();
+  const name = baby.name || "Baby";
+  const now = icsDate(new Date());
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Little Log//Appointments//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    `X-WR-CALNAME:${icsText(`${name}'s appointments`)}`,
+    "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
+    "X-PUBLISHED-TTL:PT1H",
+  ];
+  for (const doc of snap.docs) {
+    const a = doc.data();
+    if (!a.start) continue;
+    const start = a.start.toDate();
+    const end = new Date(start.getTime() + (a.durationMinutes || 30) * 60000);
+    const title = a.title || kindLabels[a.kind] || "Appointment";
+    let details = `${name}: ${kindLabels[a.kind] || "Appointment"}`;
+    if (a.notes) details += `\n\n${a.notes}`;
+    details += `\n\nFrom Little Log. Added by ${a.createdByName || "a caregiver"}.`;
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${doc.id}@littlelog`,
+      `DTSTAMP:${now}`,
+      `LAST-MODIFIED:${icsDate(doc.updateTime.toDate())}`,
+      `DTSTART:${icsDate(start)}`,
+      `DTEND:${icsDate(end)}`,
+      `SUMMARY:${icsText(`${name}: ${title}`)}`,
+      `DESCRIPTION:${icsText(details)}`,
+    );
+    if (a.location) lines.push(`LOCATION:${icsText(a.location)}`);
+    lines.push(
+      "BEGIN:VALARM",
+      "ACTION:DISPLAY",
+      `DESCRIPTION:${icsText(`${name}: ${title}`)}`,
+      "TRIGGER:-PT1H",
+      "END:VALARM",
+      "END:VEVENT",
+    );
+  }
+  lines.push("END:VCALENDAR");
+
+  res.set("Content-Type", "text/calendar; charset=utf-8");
+  res.set("Cache-Control", "public, max-age=900");
+  res.send(lines.map(fold).join("\r\n") + "\r\n");
+});

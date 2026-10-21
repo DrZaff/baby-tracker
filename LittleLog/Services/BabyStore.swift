@@ -100,6 +100,14 @@ final class BabyStore {
             .updateData(["memberEmails": FieldValue.arrayUnion([cleaned])])
     }
 
+    /// The baby's calendar feed key, created the first time someone subscribes.
+    func calendarKey(for baby: Baby) -> String {
+        if let key = baby.calendarKey, !key.isEmpty { return key }
+        let key = AppleSignIn.randomNonce(length: 24).filter { $0.isLetter || $0.isNumber }
+        db.collection("babies").document(baby.babyID).updateData(["calendarKey": key])
+        return key
+    }
+
     func removeCaregiver(email: String, from baby: Baby) {
         guard email != baby.ownerEmail else { return }
         db.collection("babies").document(baby.babyID)

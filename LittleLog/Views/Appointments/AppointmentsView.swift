@@ -5,6 +5,9 @@ struct AppointmentsView: View {
     let baby: Baby
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    @Environment(BabyStore.self) private var store
+    @State private var choosingSubscription = false
     @State private var month = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
     @State private var selectedDay = Calendar.current.startOfDay(for: Date())
     @State private var listener = AppointmentsListener()
@@ -101,6 +104,25 @@ struct AppointmentsView: View {
                     JungleHeader(title: dayTitle(selectedDay), icon: calendar.isDateInToday(selectedDay) ? "⭐️" : "🍃")
                 }
                 .listRowBackground(Theme.card)
+
+                Section {
+                    Button { choosingSubscription = true } label: {
+                        HStack(spacing: 12) {
+                            MascotBadge(animal: "📆", tint: Theme.river)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Subscribe in my calendar").font(.body.weight(.bold)).foregroundStyle(.primary)
+                                Text("Every appointment shows up in your Apple or Google Calendar and stays up to date.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                } footer: {
+                    Text("Each caregiver subscribes once on their own phone. Apple Calendar picks up changes within about an hour; Google Calendar can take up to a day.")
+                }
+                .listRowBackground(Theme.card)
             }
             .listSectionSpacing(.compact)
             .jungleBackground()
@@ -127,6 +149,12 @@ struct AppointmentsView: View {
                 AppleCalendarSheet(appointment: appointment, babyName: baby.name) { appleEvent = nil }
                     .ignoresSafeArea()
             }
+            .confirmationDialog("Subscribe to \(baby.name)'s appointments", isPresented: $choosingSubscription, titleVisibility: .visible) {
+                Button("Apple Calendar") { subscribe(AppLinks.appleCalendarFeed) }
+                Button("Google Calendar") { subscribe(AppLinks.googleCalendarFeed) }
+            } message: {
+                Text("Pick the calendar app you use. You only need to do this once.")
+            }
             .task(id: "\(baby.babyID)|\(interval.start.timeIntervalSince1970)") {
                 listener.listen(babyID: baby.babyID, from: interval.start, to: interval.end)
             }
@@ -150,6 +178,11 @@ struct AppointmentsView: View {
                 ? calendar.startOfDay(for: Date())
                 : next
         }
+    }
+
+    private func subscribe(_ link: (String, String) -> URL?) {
+        let current = store.babies.first { $0.id == baby.id } ?? baby
+        if let url = link(baby.babyID, store.calendarKey(for: current)) { openURL(url) }
     }
 
     private func goToToday() {
@@ -319,7 +352,6 @@ struct AppointmentFormView: View {
     @State private var notes: String
     @AppStorage("appointmentCalendar") private var savedChoice = CalendarChoice.none.rawValue
     @State private var calendarChoice: CalendarChoice = .none
-    @State private var invited: Set<String> = []
     @State private var appleEvent: Appointment?
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
@@ -351,14 +383,7 @@ struct AppointmentFormView: View {
         appointment.durationMinutes = duration
         appointment.location = location.trimmedOrNil
         appointment.notes = notes.trimmedOrNil
-        let everInvited = Set(existing?.invitedEmails ?? []).union(invited)
-        appointment.invitedEmails = everInvited.isEmpty ? nil : everInvited.sorted()
         return appointment
-    }
-
-    /// Everyone else who shares this baby.
-    private var otherCaregivers: [String] {
-        baby.memberEmails.filter { $0.lowercased() != auth.email }.sorted()
     }
 
 
@@ -412,30 +437,9 @@ struct AppointmentFormView: View {
                 Text("Add to my calendar")
             } footer: {
                 switch calendarChoice {
-                case .none: Text("It's saved in Little Log for everyone either way.")
+                case .none: Text("It's saved in Little Log for everyone either way. To have every appointment show up in your calendar automatically, use Subscribe on the Appointments screen.")
                 case .apple: Text("After you tap Save, the iPhone's calendar opens so you can pick which calendar to add it to.")
                 case .google: Text("After you tap Save, Google Calendar opens with the appointment filled in.")
-                }
-            }
-
-            if !otherCaregivers.isEmpty {
-                Section {
-                    ForEach(otherCaregivers, id: \.self) { email in
-                        CheckRow(
-                            title: email,
-                            subtitle: existing?.invitedEmails?.contains(email) == true ? "Already invited" : nil,
-                            isOn: Binding(
-                                get: { invited.contains(email) },
-                                set: { checked in
-                                    if checked { invited.insert(email) } else { invited.remove(email) }
-                                }
-                            )
-                        )
-                    }
-                } header: {
-                    Text("Send calendar invites")
-                } footer: {
-                    Text("Everyone who shares \(baby.name) sees this appointment in Little Log. Checked caregivers also get an email invite they can accept into any calendar. It's sent through Google Calendar, which opens with them added after you tap Save; tap Save there to send.")
                 }
             }
 
@@ -462,7 +466,6 @@ struct AppointmentFormView: View {
                         try AppointmentRepository.save(appointment, babyID: baby.babyID, auth: auth)
                         if existing == nil { savedChoice = calendarChoice.rawValue }
                         if calendarChoice == .apple {
-                            // Google (for invites) opens after the Apple calendar sheet closes.
                             appleEvent = appointment
                         } else {
                             finish(appointment)
@@ -494,43 +497,12 @@ struct AppointmentFormView: View {
         }
     }
 
-    /// Opens Google Calendar when it was picked or caregivers are being invited, then closes the form.
+    /// Opens Google Calendar when it was picked, then closes the form.
     private func finish(_ appointment: Appointment) {
-        let guests = invited.sorted()
-        if calendarChoice == .google || !guests.isEmpty,
-           let url = appointment.googleCalendarURL(babyName: baby.name, guests: guests) {
+        if calendarChoice == .google, let url = appointment.googleCalendarURL(babyName: baby.name) {
             openURL(url)
         }
         dismiss()
-    }
-}
-
-/// A tappable checkbox row.
-private struct CheckRow: View {
-    let title: String
-    let subtitle: String?
-    @Binding var isOn: Bool
-
-    var body: some View {
-        Button {
-            withAnimation(.snappy) { isOn.toggle() }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: isOn ? "checkmark.square.fill" : "square")
-                    .font(.title3)
-                    .foregroundStyle(isOn ? Theme.river : .secondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
-                    if let subtitle {
-                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
