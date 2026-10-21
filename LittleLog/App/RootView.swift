@@ -37,7 +37,7 @@ struct RootView: View {
 
 struct MainTabView: View {
     @Environment(BabyStore.self) private var store
-    @State private var tab = DesignPreview.isOn ? DesignPreview.screen : "today"
+    @State private var tab = DesignPreview.isOn ? DesignPreview.tab : "today"
 
     var body: some View {
         if let baby = store.selectedBaby {

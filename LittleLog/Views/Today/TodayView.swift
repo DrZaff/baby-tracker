@@ -20,6 +20,7 @@ struct TodayView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             List {
                 Section {
                     TodayHeader(baby: baby, day: $day)
@@ -66,6 +67,7 @@ struct TodayView: View {
 
                 Section {
                     DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric, baby: baby, day: day)
+                        .id("report")
                 } header: {
                     JungleHeader(title: isToday ? "Today's report" : "Daily report", icon: "🌿")
                 }
@@ -105,6 +107,14 @@ struct TodayView: View {
                 .listRowBackground(Theme.card)
             }
             .listSectionSpacing(.compact)
+            .onAppear {
+                switch DesignPreview.scrollTarget {
+                case "report": DesignPreview.scroll(proxy) { "report" }
+                case "timeline": DesignPreview.scroll(proxy) { dayEntries.entries.dropFirst(2).first?.id }
+                default: break
+                }
+            }
+            }
             .jungleBackground()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) { BabySwitcher() }

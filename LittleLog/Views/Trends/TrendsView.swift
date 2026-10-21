@@ -88,6 +88,7 @@ struct TrendsView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { proxy in
             ScrollView {
                 VStack(spacing: 16) {
                     Picker("Range", selection: $range) {
@@ -139,8 +140,11 @@ struct TrendsView: View {
                         points: points([("Tummy time", { Double($0.tummySeconds) / 60 })])
                     )
                     GrowthChart(entries: growth, baby: baby, metric: useMetric)
+                        .id("growth")
                 }
                 .padding()
+            }
+            .onAppear { if DesignPreview.scrollTarget == "growth" { DesignPreview.scroll(proxy) { "growth" } } }
             }
             .background(JungleBackground())
             .overlay {

@@ -18,6 +18,21 @@ enum DesignPreview {
     }
 
     static let babyID = "preview-baby"
+
+    /// "today-report" opens the Today tab scrolled to its report.
+    static var tab: String { screen.components(separatedBy: "-").first ?? screen }
+    static var scrollTarget: String? {
+        let parts = screen.components(separatedBy: "-")
+        return parts.count > 1 ? parts[1] : nil
+    }
+
+    /// Scrolls to the requested part of the screen once its sample data has appeared.
+    static func scroll<ID: Hashable>(_ proxy: ScrollViewProxy, to id: @escaping () -> ID) {
+        guard isOn else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            proxy.scrollTo(id(), anchor: .top)
+        }
+    }
 }
 
 enum DemoData {
@@ -140,7 +155,11 @@ enum DemoData {
 /// Shows one screen filled with sample data, for design checks and screenshots.
 struct DesignPreviewRoot: View {
     @State private var auth = AuthService()
-    @State private var babyStore = BabyStore()
+    @State private var babyStore: BabyStore = {
+        let store = BabyStore()
+        store.showDemo()
+        return store
+    }()
 
     var body: some View {
         content
@@ -148,7 +167,6 @@ struct DesignPreviewRoot: View {
             .environment(babyStore)
             .tint(Theme.canopy)
             .fontDesign(.rounded)
-            .onAppear { babyStore.showDemo() }
     }
 
     @ViewBuilder private var content: some View {

@@ -54,7 +54,7 @@ jobs:
           big=$(echo "$devices" | grep -E "Pro Max" | tail -1)
           small=$(echo "$devices" | grep -E "iPhone (SE|1[0-9]e|1[0-9] mini)" | tail -1)
           [ -z "$small" ] && small=$(echo "$devices" | grep -vE "Pro|Plus|Air" | tail -1)
-          screens="today trends photos family feed tummy diaper growth milestone appointments newAppointment signin"
+          screens="today today-report today-timeline trends trends-growth photos family feed tummy diaper growth milestone appointments newAppointment signin"
           for pick in "$big" "$small"; do
             name=$(echo "${pick%%|*}" | tr ' ' '-')
             udid="${pick##*|}"
@@ -75,10 +75,10 @@ jobs:
             t 30 xcrun simctl ui "$udid" appearance light
             for s in $screens; do shoot "$s" light; done
             t 30 xcrun simctl ui "$udid" appearance dark
-            for s in today trends feed appointments; do shoot "$s" dark; done
+            for s in today today-report trends feed appointments; do shoot "$s" dark; done
             t 30 xcrun simctl ui "$udid" appearance light
             t 30 xcrun simctl ui "$udid" content_size extra-extra-large
-            for s in today feed appointments; do shoot "$s" bigtext; done
+            for s in today today-report feed appointments newAppointment; do shoot "$s" bigtext; done
             t 30 xcrun simctl ui "$udid" content_size large
             t 60 xcrun simctl shutdown "$udid"
             echo "::endgroup::"
