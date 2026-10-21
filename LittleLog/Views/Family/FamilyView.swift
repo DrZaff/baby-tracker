@@ -128,7 +128,7 @@ struct FamilyView: View {
                 } header: {
                     JungleHeader(title: "Settings", icon: "🌿")
                 } footer: {
-                    Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long. The vitamin D reminder adds a daily checkbox when logging a feed and shows how often it was given in Trends.")
+                    Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long. The vitamin D reminder adds a daily checkbox when logging a feed, plus a Vitamin D tile on the daily report.")
                 }
 
                 Section {

@@ -310,6 +310,10 @@ struct DailyReportGrid: View {
                     lines: summary.vitaminD ? [] : ["Check it off when logging a feed"]
                 )
             }
+            ReportTile(
+                title: "Tummy time", value: Units.duration(summary.tummySeconds), animal: Theme.tummyAnimal, tint: Theme.tummy,
+                lines: [summary.tummyCount == 0 ? "None yet today" : "\(summary.tummyCount) session\(summary.tummyCount == 1 ? "" : "s")"]
+            )
             if summary.sleepCount > 0 {
                 ReportTile(
                     title: "Sleep", value: Units.duration(summary.sleepSeconds), animal: Theme.sleepAnimal, tint: Theme.sleep,

@@ -19,6 +19,8 @@ struct DaySummary {
     var latestLengthCm: Double?
     var latestHeadCm: Double?
     var vitaminD = false
+    var tummyCount = 0
+    var tummySeconds = 0
     var sleepCount = 0
     var sleepSeconds = 0
     var milestones: [String] = []
@@ -52,6 +54,9 @@ struct DaySummary {
                 diaperCount += 1
                 if entry.wet == true { wetCount += 1 }
                 if entry.dirty == true { dirtyCount += 1 }
+            case .tummy:
+                tummyCount += 1
+                tummySeconds += entry.tummySeconds ?? 0
             case .sleep:
                 sleepCount += 1
                 sleepSeconds += entry.sleepSeconds(now: now)

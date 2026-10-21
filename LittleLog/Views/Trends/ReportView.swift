@@ -55,7 +55,7 @@ struct ReportView: View {
                 } header: {
                     JungleHeader(title: "Report for \(baby.name)", icon: "🩺")
                 } footer: {
-                    Text("Includes daily feeds, sleep and diapers, growth with WHO percentiles, and milestones. Share it by email, Messages or AirDrop, or print it.")
+                    Text("Includes daily feeds, tummy time and diapers, growth with WHO percentiles, and milestones. Share it by email, Messages or AirDrop, or print it.")
                 }
 
                 Section {
@@ -254,6 +254,9 @@ private struct ReportSummaryPage: View {
                 if data.total.pumpedML > 0 {
                     row("Pumped", "\(Units.volume(data.total.pumpedML / data.dayCount, metric: data.metric)) per day")
                 }
+                if data.total.tummySeconds > 0 {
+                    row("Tummy time", "\(Units.duration(Int(Double(data.total.tummySeconds) / data.dayCount))) per day")
+                }
                 if data.total.sleepSeconds > 0 {
                     row("Sleep", "\(Units.duration(Int(Double(data.total.sleepSeconds) / data.dayCount))) per day")
                 }
@@ -339,7 +342,7 @@ private struct ReportDaysPage: View {
             Text("Day by day\(of > 1 ? " (\(part) of \(of))" : "")").font(.system(size: 15, weight: .bold))
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
                 GridRow {
-                    Text("Date"); Text("Feeds"); Text("Breast"); Text("Bottle"); Text("Pumped"); Text("Sleep"); Text("Wet"); Text("Dirty")
+                    Text("Date"); Text("Feeds"); Text("Breast"); Text("Bottle"); Text("Pumped"); Text("Tummy"); Text("Wet"); Text("Dirty")
                 }
                 .font(.system(size: 9, weight: .semibold))
                 Divider().gridCellUnsizedAxes(.horizontal)
@@ -351,7 +354,7 @@ private struct ReportDaysPage: View {
                         Text(s.breastSeconds > 0 ? Units.duration(s.breastSeconds) : "—")
                         Text(s.bottleML > 0 ? Units.volume(s.bottleML, metric: data.metric) : "—")
                         Text(s.pumpedML > 0 ? Units.volume(s.pumpedML, metric: data.metric) : "—")
-                        Text(s.sleepSeconds > 0 ? Units.duration(s.sleepSeconds) : "—")
+                        Text(s.tummySeconds > 0 ? Units.duration(s.tummySeconds) : "—")
                         Text("\(s.wetCount)")
                         Text("\(s.dirtyCount)")
                     }

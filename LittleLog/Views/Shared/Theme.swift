@@ -29,6 +29,7 @@ enum Theme {
     static let bottle = mango
     static let pump = orchid
     static let sleep = dusk
+    static let tummy = leaf
     static let diaper = lagoon
     static let weight = river
     static let milestone = sunshine
@@ -39,6 +40,7 @@ enum Theme {
     static let bottleAnimal = "🦒"
     static let pumpAnimal = "🦩"
     static let sleepAnimal = "🐨"
+    static let tummyAnimal = "🐢"
     static let diaperAnimal = "🐒"
     static let weightAnimal = "🦛"
     static let milestoneAnimal = "🦁"
@@ -66,6 +68,7 @@ extension LogEntry {
         switch kind {
         case .feed: return isPumpOnly ? Theme.pumpAnimal : (hasBreast ? Theme.feedAnimal : Theme.bottleAnimal)
         case .sleep: return Theme.sleepAnimal
+        case .tummy: return Theme.tummyAnimal
         case .diaper: return Theme.diaperAnimal
         case .weight: return Theme.weightAnimal
         case .milestone: return Theme.milestoneAnimal
@@ -77,6 +80,7 @@ extension LogEntry {
         switch kind {
         case .feed: return isPumpOnly ? Theme.pump : (hasBreast ? Theme.feed : Theme.bottle)
         case .sleep: return Theme.sleep
+        case .tummy: return Theme.tummy
         case .diaper: return Theme.diaper
         case .weight: return Theme.weight
         case .milestone: return Theme.milestone

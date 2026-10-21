@@ -134,13 +134,10 @@ struct TrendsView: View {
                         ])
                     )
                     ChartCard(
-                        title: "Sleep", subtitle: "hours \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
-                        animal: Theme.sleepAnimal,
-                        points: points([("Sleep", { Double($0.sleepSeconds) / 3600 })])
+                        title: "Tummy time", subtitle: "minutes \(perLabel)", unit: bucketUnit, valueFormat: "%.0f",
+                        animal: Theme.tummyAnimal,
+                        points: points([("Tummy time", { Double($0.tummySeconds) / 60 })])
                     )
-                    if baby.vitaminDReminder == true {
-                        VitaminDCard(entries: entries, baby: baby, rangeStart: rangeStart, byMonth: range == .year)
-                    }
                     GrowthChart(entries: growth, baby: baby, metric: useMetric)
                 }
                 .padding()
@@ -469,112 +466,5 @@ struct WeightChange: View {
     private func symbol(_ percent: Double) -> String {
         if abs(percent) < 0.05 { return "equal.circle" }
         return percent > 0 ? "arrow.up.right.circle" : "arrow.down.right.circle"
-    }
-}
-
-/// How many days vitamin D was given, shown when the vitamin D reminder is on.
-struct VitaminDCard: View {
-    let entries: [LogEntry]
-    let baby: Baby
-    let rangeStart: Date
-    let byMonth: Bool
-
-    private var calendar: Calendar { Calendar.current }
-
-    private struct Day: Identifiable {
-        let date: Date
-        let given: Bool
-        var id: Date { date }
-    }
-
-    private struct Month: Identifiable {
-        let date: Date
-        var given: Int
-        var total: Int
-        var id: Date { date }
-    }
-
-    /// Days that count: from the later of the range start, birth and when the reminder was turned on, to today.
-    private var days: [Day] {
-        let given = Set(entries.filter { $0.vitaminD == true }.map { calendar.startOfDay(for: $0.timestamp) })
-        var from = max(rangeStart, calendar.startOfDay(for: baby.birthDate))
-        if let since = baby.vitaminDSince { from = max(from, calendar.startOfDay(for: since)) }
-        let today = calendar.startOfDay(for: Date())
-        var result: [Day] = []
-        var day = calendar.startOfDay(for: from)
-        while day <= today {
-            result.append(Day(date: day, given: given.contains(day)))
-            day = calendar.date(byAdding: .day, value: 1, to: day) ?? today.addingTimeInterval(86_400)
-        }
-        return result
-    }
-
-    private var months: [Month] {
-        var result: [Month] = []
-        for day in days {
-            let month = calendar.date(from: calendar.dateComponents([.year, .month], from: day.date)) ?? day.date
-            if result.last?.date != month { result.append(Month(date: month, given: 0, total: 0)) }
-            result[result.count - 1].total += 1
-            if day.given { result[result.count - 1].given += 1 }
-        }
-        return result
-    }
-
-    var body: some View {
-        let days = self.days
-        let given = days.filter { $0.given }.count
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("☀️ Vitamin D").font(.headline).foregroundStyle(Theme.canopy)
-                Spacer()
-                if !days.isEmpty {
-                    Text("\(given) of \(days.count) days · \(Int((Double(given) / Double(days.count) * 100).rounded()))%")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.mango)
-                }
-            }
-            if days.isEmpty {
-                Text("Adherence shows up here from the day the reminder was turned on.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            } else if byMonth {
-                VStack(spacing: 6) {
-                    ForEach(months) { month in
-                        HStack(spacing: 8) {
-                            Text(month.date.formatted(.dateTime.month(.abbreviated)))
-                                .font(.caption).frame(width: 34, alignment: .leading)
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule().fill(Theme.mango.opacity(0.15))
-                                    Capsule().fill(Theme.mango)
-                                        .frame(width: geo.size.width * CGFloat(month.given) / CGFloat(max(1, month.total)))
-                                }
-                            }
-                            .frame(height: 10)
-                            Text("\(Int((Double(month.given) / Double(max(1, month.total)) * 100).rounded()))%")
-                                .font(.caption.monospacedDigit()).frame(width: 40, alignment: .trailing)
-                        }
-                    }
-                }
-            } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                    ForEach(days) { day in
-                        VStack(spacing: 2) {
-                            ZStack {
-                                Circle()
-                                    .fill(day.given ? Theme.sunshine.opacity(0.35) : Color.clear)
-                                    .overlay(Circle().strokeBorder(day.given ? Theme.mango : Color.secondary.opacity(0.3), lineWidth: 1.5))
-                                if day.given { Text("☀️").font(.caption) }
-                            }
-                            .frame(width: 30, height: 30)
-                            Text(day.date.formatted(.dateTime.day()))
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(day.date.formatted(date: .abbreviated, time: .omitted)): \(day.given ? "given" : "not given")")
-                    }
-                }
-            }
-        }
-        .jungleCard(padding: 16)
     }
 }

@@ -19,7 +19,7 @@ struct Baby: Identifiable, Codable, Equatable {
     var createdAt: Date
     /// Remind every caregiver when this many hours pass without a feed. Nil means off.
     var feedReminderHours: Double?
-    /// Shows a daily vitamin D checkbox when logging feeds, and adherence in Trends.
+    /// Shows a daily vitamin D checkbox when logging feeds and a tile on the daily report.
     var vitaminDReminder: Bool?
     /// When the vitamin D reminder was turned on, so adherence only counts from then.
     var vitaminDSince: Date?

@@ -152,33 +152,21 @@ struct LogBottleIntent: AppIntent {
     }
 }
 
-struct StartSleepIntent: AppIntent {
-    static let title: LocalizedStringResource = "Start a sleep"
-    static let description = IntentDescription("Logs that the baby fell asleep.")
+struct LogTummyTimeIntent: AppIntent {
+    static let title: LocalizedStringResource = "Log tummy time"
+    static let description = IntentDescription("Logs a tummy time session that just finished.")
+
+    @Parameter(title: "Minutes", requestValueDialog: "How many minutes of tummy time?")
+    var minutes: Int
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let context = try await IntentBackend.context()
-        if try await IntentBackend.recent(context).contains(where: { $0.isSleeping }) {
-            return .result(dialog: IntentDialog(stringLiteral: "\(context.babyName) is already logged as sleeping."))
-        }
-        try await IntentBackend.save(IntentBackend.newEntry(.sleep, context), context)
-        return .result(dialog: IntentDialog(stringLiteral: "Sweet dreams, \(context.babyName). 🐨"))
-    }
-}
-
-struct WakeUpIntent: AppIntent {
-    static let title: LocalizedStringResource = "Baby woke up"
-    static let description = IntentDescription("Ends the current sleep.")
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        let context = try await IntentBackend.context()
-        guard var sleep = try await IntentBackend.recent(context).first(where: { $0.isSleeping }) else {
-            throw IntentError.notSleeping
-        }
-        sleep.sleepEnd = Date()
-        try await IntentBackend.save(sleep, context)
-        await LiveActivities.shared.endSleep()
-        return .result(dialog: IntentDialog(stringLiteral: "Good morning, \(context.babyName)! That was \(Units.spoken(sleep.sleepSeconds())) of sleep. ☀️"))
+        let seconds = max(1, minutes) * 60
+        var entry = IntentBackend.newEntry(.tummy, context)
+        entry.timestamp = Date().addingTimeInterval(-TimeInterval(seconds))
+        entry.tummySeconds = seconds
+        try await IntentBackend.save(entry, context)
+        return .result(dialog: IntentDialog(stringLiteral: "Logged \(Units.spoken(seconds)) of tummy time for \(context.babyName). 🐢"))
     }
 }
 
@@ -222,22 +210,13 @@ struct LittleLogShortcuts: AppShortcutsProvider {
             systemImageName: "drop.fill"
         )
         AppShortcut(
-            intent: StartSleepIntent(),
+            intent: LogTummyTimeIntent(),
             phrases: [
-                "Start a nap in \(.applicationName)",
-                "Baby fell asleep in \(.applicationName)",
+                "Log tummy time in \(.applicationName)",
+                "Tummy time in \(.applicationName)",
             ],
-            shortTitle: "Start sleep",
-            systemImageName: "moon.zzz.fill"
-        )
-        AppShortcut(
-            intent: WakeUpIntent(),
-            phrases: [
-                "Baby woke up in \(.applicationName)",
-                "End the nap in \(.applicationName)",
-            ],
-            shortTitle: "Woke up",
-            systemImageName: "sun.max.fill"
+            shortTitle: "Tummy time",
+            systemImageName: "figure.play"
         )
         AppShortcut(
             intent: LastFeedIntent(),

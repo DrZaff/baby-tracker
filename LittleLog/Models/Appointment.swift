@@ -40,6 +40,8 @@ struct Appointment: Identifiable, Codable, Equatable {
     var durationMinutes: Int
     var location: String?
     var notes: String?
+    /// Caregivers sent a Google Calendar invite for this appointment.
+    var invitedEmails: [String]?
     /// Read after a name in notifications, e.g. "Sam added an appointment: Vaccines on Tue, Oct 28 at 9:30 AM".
     var summary: String?
     var createdByUid: String
@@ -55,7 +57,8 @@ struct Appointment: Identifiable, Codable, Equatable {
     }
 
     /// Opens Google Calendar with this appointment filled in, ready to save.
-    func googleCalendarURL(babyName: String) -> URL? {
+    /// Guests get an invite at their Gmail once it's saved.
+    func googleCalendarURL(babyName: String, guests: [String] = []) -> URL? {
         let format = DateFormatter()
         format.locale = Locale(identifier: "en_US_POSIX")
         format.timeZone = TimeZone(identifier: "UTC")
@@ -71,6 +74,9 @@ struct Appointment: Identifiable, Codable, Equatable {
             URLQueryItem(name: "details", value: details),
             URLQueryItem(name: "location", value: location?.trimmedOrNil ?? ""),
         ]
+        if !guests.isEmpty {
+            components?.queryItems?.append(URLQueryItem(name: "add", value: guests.joined(separator: ",")))
+        }
         return components?.url
     }
 }

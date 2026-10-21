@@ -1,24 +1,12 @@
 import SwiftUI
 
-/// Every appointment for the baby, by week, month or year, shared with all caregivers.
+/// Every appointment for the baby on a month calendar, shared with all caregivers.
 struct AppointmentsView: View {
     let baby: Baby
 
-    enum Period: String, CaseIterable, Identifiable {
-        case week = "Week", month = "Month", year = "Year"
-        var id: String { rawValue }
-        var component: Calendar.Component {
-            switch self {
-            case .week: return .weekOfYear
-            case .month: return .month
-            case .year: return .year
-            }
-        }
-    }
-
     @Environment(\.dismiss) private var dismiss
-    @State private var period: Period = .month
-    @State private var anchor = Date()
+    @State private var month = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
+    @State private var selectedDay = Calendar.current.startOfDay(for: Date())
     @State private var listener = AppointmentsListener()
     @State private var editing: Appointment?
     @State private var adding = false
@@ -26,40 +14,11 @@ struct AppointmentsView: View {
     private var calendar: Calendar { Calendar.current }
 
     private var interval: DateInterval {
-        calendar.dateInterval(of: period.component, for: anchor) ?? DateInterval(start: anchor, duration: 86_400)
+        calendar.dateInterval(of: .month, for: month) ?? DateInterval(start: month, duration: 86_400 * 31)
     }
 
-    private var periodLabel: String {
-        let interval = self.interval
-        switch period {
-        case .week:
-            let last = interval.end.addingTimeInterval(-1)
-            return "\(interval.start.formatted(.dateTime.month(.abbreviated).day())) – \(last.formatted(.dateTime.month(.abbreviated).day()))"
-        case .month: return interval.start.formatted(.dateTime.month(.wide).year())
-        case .year: return interval.start.formatted(.dateTime.year())
-        }
-    }
-
-    private struct Group: Identifiable {
-        let title: String
-        var items: [Appointment]
-        var id: String { title }
-    }
-
-    /// Appointments grouped by day (week and month) or by month (year).
-    private var groups: [Group] {
-        var result: [Group] = []
-        for appointment in listener.appointments {
-            let title = period == .year
-                ? appointment.start.formatted(.dateTime.month(.wide))
-                : dayTitle(appointment.start)
-            if result.last?.title == title {
-                result[result.count - 1].items.append(appointment)
-            } else {
-                result.append(Group(title: title, items: [appointment]))
-            }
-        }
-        return result
+    private var selectedAppointments: [Appointment] {
+        listener.appointments.filter { calendar.isDate($0.start, inSameDayAs: selectedDay) }
     }
 
     private func dayTitle(_ date: Date) -> String {
@@ -73,17 +32,13 @@ struct AppointmentsView: View {
             List {
                 Section {
                     VStack(spacing: 12) {
-                        Picker("Period", selection: $period) {
-                            ForEach(Period.allCases) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
                         HStack {
                             Button { shift(-1) } label: { Image(systemName: "chevron.left.circle.fill").font(.title2) }
                             Spacer()
                             VStack(spacing: 2) {
-                                Text(periodLabel).font(.headline)
+                                Text(interval.start.formatted(.dateTime.month(.wide).year())).font(.headline)
                                 if !interval.contains(Date()) {
-                                    Button("Back to now") { withAnimation(.snappy) { anchor = Date() } }
+                                    Button("Back to today") { goToToday() }
                                         .font(.caption.weight(.semibold))
                                 }
                             }
@@ -92,50 +47,56 @@ struct AppointmentsView: View {
                         }
                         .buttonStyle(.borderless)
                         .foregroundStyle(Theme.canopy)
+                        MonthGrid(
+                            month: interval,
+                            appointments: listener.appointments,
+                            selectedDay: $selectedDay
+                        )
                     }
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 30).onEnded { drag in
+                            guard abs(drag.translation.width) > abs(drag.translation.height) else { return }
+                            shift(drag.translation.width < 0 ? 1 : -1)
+                        }
+                    )
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4))
+                .listRowBackground(Theme.card)
 
-                if listener.hasLoaded && listener.appointments.isEmpty {
-                    Section {
+                Section {
+                    if selectedAppointments.isEmpty {
                         HStack(spacing: 12) {
                             Text("🦉").font(.largeTitle)
-                            Text("No appointments this \(period.rawValue.lowercased()). Tap + to add one.")
+                            Text(listener.hasLoaded ? "Nothing on this day. Tap + to add an appointment." : "Loading…")
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 6)
                     }
-                    .listRowBackground(Theme.card)
-                }
-
-                ForEach(groups) { group in
-                    Section {
-                        ForEach(group.items) { appointment in
-                            Button { editing = appointment } label: {
-                                AppointmentRow(appointment: appointment, showDate: period == .year)
+                    ForEach(selectedAppointments) { appointment in
+                        Button { editing = appointment } label: {
+                            AppointmentRow(appointment: appointment)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                AppointmentRepository.delete(appointment, babyID: baby.babyID)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
-                            .buttonStyle(.plain)
-                            .swipeActions {
-                                Button(role: .destructive) {
-                                    AppointmentRepository.delete(appointment, babyID: baby.babyID)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .contextMenu {
-                                if let url = appointment.googleCalendarURL(babyName: baby.name) {
-                                    Link(destination: url) {
-                                        Label("Add to Google Calendar", systemImage: "calendar.badge.plus")
-                                    }
+                        }
+                        .contextMenu {
+                            if let url = appointment.googleCalendarURL(babyName: baby.name) {
+                                Link(destination: url) {
+                                    Label("Add to Google Calendar", systemImage: "calendar.badge.plus")
                                 }
                             }
                         }
-                    } header: {
-                        JungleHeader(title: group.title, icon: group.title == "Today" ? "⭐️" : "🍃")
                     }
-                    .listRowBackground(Theme.card)
+                } header: {
+                    JungleHeader(title: dayTitle(selectedDay), icon: calendar.isDateInToday(selectedDay) ? "⭐️" : "🍃")
                 }
+                .listRowBackground(Theme.card)
             }
             .listSectionSpacing(.compact)
             .jungleBackground()
@@ -158,24 +119,147 @@ struct AppointmentsView: View {
                     AppointmentFormView(baby: baby, existing: appointment, defaultDate: appointment.start)
                 }
             }
-            .task(id: "\(baby.babyID)|\(interval.start.timeIntervalSince1970)|\(period.rawValue)") {
+            .task(id: "\(baby.babyID)|\(interval.start.timeIntervalSince1970)") {
                 listener.listen(babyID: baby.babyID, from: interval.start, to: interval.end)
             }
         }
     }
 
-    /// New appointments start tomorrow at 9:00, or inside the period being viewed.
+    /// New appointments go on the selected day at 9:00, or the next hour if that has passed.
     private var defaultDate: Date {
-        let base = interval.contains(Date())
-            ? (calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date())
-            : interval.start
-        return calendar.date(bySettingHour: 9, minute: 0, second: 0, of: base) ?? base
+        let nine = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: selectedDay) ?? selectedDay
+        guard nine < Date() else { return nine }
+        let nextHour = calendar.dateInterval(of: .hour, for: Date())?.end ?? Date()
+        return calendar.isDate(nextHour, inSameDayAs: selectedDay) ? nextHour : nine
     }
 
     private func shift(_ amount: Int) {
-        if let next = calendar.date(byAdding: period.component, value: amount, to: anchor) {
-            withAnimation(.snappy) { anchor = next }
+        guard let next = calendar.date(byAdding: .month, value: amount, to: interval.start) else { return }
+        withAnimation(.snappy) {
+            month = next
+            // Keep today selected when coming back to this month, otherwise pick the 1st.
+            selectedDay = calendar.isDate(Date(), equalTo: next, toGranularity: .month)
+                ? calendar.startOfDay(for: Date())
+                : next
         }
+    }
+
+    private func goToToday() {
+        withAnimation(.snappy) {
+            month = calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
+            selectedDay = calendar.startOfDay(for: Date())
+        }
+    }
+}
+
+/// A traditional month calendar. Days with appointments show their emoji.
+struct MonthGrid: View {
+    let month: DateInterval
+    let appointments: [Appointment]
+    @Binding var selectedDay: Date
+
+    private struct Cell: Identifiable {
+        let id: Int
+        let date: Date?
+    }
+
+    private struct Weekday: Identifiable {
+        let id: Int
+        let symbol: String
+    }
+
+    private var calendar: Calendar { Calendar.current }
+
+    private var weekdays: [Weekday] {
+        let symbols = calendar.veryShortWeekdaySymbols
+        let first = calendar.firstWeekday - 1
+        return (0..<7).map { Weekday(id: $0, symbol: symbols[(first + $0) % 7]) }
+    }
+
+    /// Blank cells before the 1st so each day lands under its weekday, then every day of the month.
+    private var cells: [Cell] {
+        let leading = (calendar.component(.weekday, from: month.start) - calendar.firstWeekday + 7) % 7
+        let days = calendar.range(of: .day, in: .month, for: month.start)?.count ?? 30
+        var result = (0..<leading).map { Cell(id: $0, date: nil) }
+        for day in 0..<days {
+            result.append(Cell(id: leading + day, date: calendar.date(byAdding: .day, value: day, to: month.start)))
+        }
+        return result
+    }
+
+    private var byDay: [Date: [Appointment]] {
+        Dictionary(grouping: appointments) { calendar.startOfDay(for: $0.start) }
+    }
+
+    var body: some View {
+        let byDay = self.byDay
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+        LazyVGrid(columns: columns, spacing: 6) {
+            ForEach(weekdays) { weekday in
+                Text(weekday.symbol)
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(cells) { cell in
+                if let date = cell.date {
+                    DayCell(
+                        date: date,
+                        appointments: byDay[date] ?? [],
+                        isSelected: calendar.isDate(date, inSameDayAs: selectedDay),
+                        isToday: calendar.isDateInToday(date)
+                    )
+                    .onTapGesture {
+                        withAnimation(.snappy) { selectedDay = date }
+                    }
+                } else {
+                    Color.clear.frame(height: 52)
+                }
+            }
+        }
+    }
+}
+
+private struct DayCell: View {
+    let date: Date
+    let appointments: [Appointment]
+    let isSelected: Bool
+    let isToday: Bool
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(Calendar.current.component(.day, from: date))")
+                .font(.subheadline.weight(isToday || isSelected ? .heavy : .medium).monospacedDigit())
+                .foregroundStyle(isSelected ? .white : isToday ? Theme.river : .primary)
+                .frame(width: 28, height: 28)
+                .background {
+                    if isSelected {
+                        Circle().fill(Theme.river)
+                    } else if isToday {
+                        Circle().strokeBorder(Theme.river, lineWidth: 1.5)
+                    }
+                }
+            HStack(spacing: 0) {
+                ForEach(appointments.prefix(2)) { appointment in
+                    Text(appointment.kind.emoji).font(.system(size: 11))
+                }
+                if appointments.count > 2 {
+                    Text("+\(appointments.count - 2)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: 14)
+        }
+        .frame(maxWidth: .infinity, minHeight: 52)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(appointments.isEmpty ? Color.clear : Theme.river.opacity(0.1))
+        )
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(date.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+        .accessibilityValue(appointments.isEmpty ? "No appointments" : appointments.map(\.displayTitle).joined(separator: ", "))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -223,6 +307,8 @@ struct AppointmentFormView: View {
     @State private var duration: Int
     @State private var location: String
     @State private var notes: String
+    @State private var addToMyCalendar = false
+    @State private var invited: Set<String> = []
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
 
@@ -250,8 +336,17 @@ struct AppointmentFormView: View {
         appointment.durationMinutes = duration
         appointment.location = location.trimmedOrNil
         appointment.notes = notes.trimmedOrNil
+        let everInvited = Set(existing?.invitedEmails ?? []).union(invited)
+        appointment.invitedEmails = everInvited.isEmpty ? nil : everInvited.sorted()
         return appointment
     }
+
+    /// Everyone else who shares this baby.
+    private var otherCaregivers: [String] {
+        baby.memberEmails.filter { $0.lowercased() != auth.email }.sorted()
+    }
+
+    private var opensCalendar: Bool { addToMyCalendar || !invited.isEmpty }
 
     var body: some View {
         Form {
@@ -294,13 +389,26 @@ struct AppointmentFormView: View {
             }
 
             Section {
-                Button {
-                    if let url = draft.googleCalendarURL(babyName: baby.name) { openURL(url) }
-                } label: {
-                    Label("Add to Google Calendar", systemImage: "calendar.badge.plus")
+                CheckRow(title: "Add to my Google Calendar", subtitle: nil, isOn: $addToMyCalendar)
+                ForEach(otherCaregivers, id: \.self) { email in
+                    CheckRow(
+                        title: "Invite \(email)",
+                        subtitle: existing?.invitedEmails?.contains(email) == true ? "Already invited" : nil,
+                        isOn: Binding(
+                            get: { invited.contains(email) },
+                            set: { checked in
+                                if checked { invited.insert(email) } else { invited.remove(email) }
+                                if checked { addToMyCalendar = true }
+                            }
+                        )
+                    )
                 }
+            } header: {
+                Text("Google Calendar")
             } footer: {
-                Text("Opens Google Calendar with the appointment filled in, so you can save it to your own calendar.")
+                Text(otherCaregivers.isEmpty
+                     ? "Everyone who shares \(baby.name) sees this appointment in Little Log. Invite caregivers from the Family tab to send them calendar invites too."
+                     : "Everyone who shares \(baby.name) sees this appointment in Little Log either way. Checked caregivers also get an invite at their Gmail: after you tap Save here, Google Calendar opens with them added, and they're sent the invite when you save it there.")
             }
 
             if existing != nil {
@@ -322,7 +430,11 @@ struct AppointmentFormView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     do {
-                        try AppointmentRepository.save(draft, babyID: baby.babyID, auth: auth)
+                        let appointment = draft
+                        try AppointmentRepository.save(appointment, babyID: baby.babyID, auth: auth)
+                        if opensCalendar, let url = appointment.googleCalendarURL(babyName: baby.name, guests: invited.sorted()) {
+                            openURL(url)
+                        }
                         dismiss()
                     } catch {
                         errorMessage = error.localizedDescription
@@ -342,6 +454,35 @@ struct AppointmentFormView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+}
+
+/// A tappable checkbox row.
+private struct CheckRow: View {
+    let title: String
+    let subtitle: String?
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.snappy) { isOn.toggle() }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: isOn ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundStyle(isOn ? Theme.river : .secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title).foregroundStyle(.primary).lineLimit(1).minimumScaleFactor(0.8)
+                    if let subtitle {
+                        Text(subtitle).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
