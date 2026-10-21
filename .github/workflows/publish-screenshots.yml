@@ -1,0 +1,37 @@
+name: Publish screenshots
+
+# Copies a Screenshots run's images to the "design-screenshots" branch,
+# so they can be viewed without downloading the artifact zip.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Screenshots run ID
+        required: true
+  workflow_run:
+    workflows: [Screenshots]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: screenshots
+          path: shots
+          run-id: ${{ inputs.run_id || github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Push to the design-screenshots branch
+        run: |
+          cd shots
+          git init -q -b design-screenshots
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -qm "Screenshots from run ${{ inputs.run_id || github.event.workflow_run.id }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" design-screenshots
