@@ -54,6 +54,11 @@ jobs:
           big=$(echo "$devices" | grep -E "Pro Max" | tail -1)
           small=$(echo "$devices" | grep -E "iPhone (SE|1[0-9]e|1[0-9] mini)" | tail -1)
           [ -z "$small" ] && small=$(echo "$devices" | grep -vE "Pro|Plus|Air" | tail -1)
+          # Show the sample data in late afternoon local time, so "today" looks lived-in.
+          utc_hour=$(date -u +%H); offset=$(( (10#$utc_hour - 17 + 24) % 24 )); [ $offset -gt 12 ] && offset=$((offset - 24))
+          if [ $offset -ge 0 ]; then zone="Etc/GMT+$offset"; else zone="Etc/GMT$offset"; fi
+          echo "Time zone for screenshots: $zone"
+          export SIMCTL_CHILD_TZ="$zone"
           screens="today today-report today-timeline trends trends-growth photos family feed tummy diaper growth milestone appointments newAppointment signin"
           for pick in "$big" "$small"; do
             name=$(echo "${pick%%|*}" | tr ' ' '-')
