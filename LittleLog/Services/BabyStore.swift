@@ -26,7 +26,14 @@ final class BabyStore {
         UserDefaults.standard.set(baby.id, forKey: Self.selectionKey)
     }
 
+    /// Sample baby for the design preview.
+    func showDemo() {
+        babies = [DemoData.baby]
+        hasLoaded = true
+    }
+
     func start(email: String) {
+        guard !DesignPreview.isOn else { return showDemo() }
         stop()
         listener = db.collection("babies")
             .whereField("memberEmails", arrayContains: email)

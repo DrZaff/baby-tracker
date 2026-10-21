@@ -1,0 +1,81 @@
+name: Screenshots
+
+# Builds the app for the iPhone simulator, opens each screen with sample data
+# (the app's design preview mode, Debug builds only) and saves screenshots.
+# Download them from the run's "screenshots" artifact.
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the newest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | grep -viE "beta|_rc" | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project LittleLog.xcodeproj \
+            -scheme LittleLog \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" build.log
+
+      - name: Take screenshots
+        run: |
+          APP=build/Build/Products/Debug-iphonesimulator/LittleLog.app
+          BUNDLE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
+          mkdir -p shots
+          devices=$(xcrun simctl list devices available | grep -E "^\s+iPhone" | sed -E 's/^ +//; s/ \(([0-9A-F-]{36})\).*/|\1/')
+          echo "$devices"
+          big=$(echo "$devices" | grep -E "Pro Max" | tail -1)
+          small=$(echo "$devices" | grep -E "iPhone (SE|1[0-9]e|1[0-9] mini)" | tail -1)
+          [ -z "$small" ] && small=$(echo "$devices" | grep -vE "Pro|Plus|Air" | tail -1)
+          screens="today trends photos family feed tummy diaper growth milestone appointments newAppointment signin"
+          for pick in "$big" "$small"; do
+            name=$(echo "${pick%%|*}" | tr ' ' '-')
+            udid="${pick##*|}"
+            [ -z "$udid" ] && continue
+            echo "Using $name ($udid)"
+            xcrun simctl boot "$udid" || true
+            xcrun simctl bootstatus "$udid" -b
+            xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+            xcrun simctl install "$udid" "$APP"
+            shoot() {
+              xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" -designPreview -screen "$1" > /dev/null
+              sleep 6
+              xcrun simctl io "$udid" screenshot "shots/$name-$2-$1.png" > /dev/null 2>&1
+            }
+            xcrun simctl ui "$udid" appearance light
+            for s in $screens; do shoot "$s" light; done
+            xcrun simctl ui "$udid" appearance dark
+            for s in today trends feed appointments; do shoot "$s" dark; done
+            xcrun simctl ui "$udid" appearance light
+            xcrun simctl ui "$udid" content_size extra-extra-large
+            for s in today feed appointments; do shoot "$s" bigtext; done
+            xcrun simctl ui "$udid" content_size large
+            xcrun simctl shutdown "$udid"
+          done
+          ls shots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots

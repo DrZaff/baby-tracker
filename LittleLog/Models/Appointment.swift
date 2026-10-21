@@ -115,6 +115,11 @@ final class AppointmentsListener {
 
     func listen(babyID: String, from start: Date, to end: Date) {
         stop()
+        if DesignPreview.isOn {
+            appointments = DemoData.appointments.filter { $0.start >= start && $0.start < end }
+            hasLoaded = true
+            return
+        }
         listener = AppointmentRepository.collection(babyID)
             .whereField("start", isGreaterThanOrEqualTo: start)
             .whereField("start", isLessThan: end)

@@ -27,6 +27,7 @@ enum EntryRepository {
     }
 
     static func fetch(babyID: String, from start: Date, to end: Date) async throws -> [LogEntry] {
+        if DesignPreview.isOn { return DemoData.entries(from: start, to: end).reversed() }
         let snapshot = try await entries(for: babyID)
             .whereField("timestamp", isGreaterThanOrEqualTo: start)
             .whereField("timestamp", isLessThan: end)
@@ -37,6 +38,7 @@ enum EntryRepository {
 
     /// Every weight, length and head size ever logged, oldest first.
     static func fetchGrowth(babyID: String) async throws -> [LogEntry] {
+        if DesignPreview.isOn { return DemoData.entries.filter { $0.kind == .weight }.reversed() }
         let snapshot = try await entries(for: babyID)
             .whereField("kind", isEqualTo: EntryKind.weight.rawValue)
             .getDocuments()
@@ -56,6 +58,11 @@ final class EntriesListener {
 
     func listen(babyID: String, from start: Date, to end: Date? = nil) {
         stop()
+        if DesignPreview.isOn {
+            entries = DemoData.entries(from: start, to: end)
+            hasLoaded = true
+            return
+        }
         var query: Query = EntryRepository.entries(for: babyID)
             .whereField("timestamp", isGreaterThanOrEqualTo: start)
         if let end { query = query.whereField("timestamp", isLessThan: end) }

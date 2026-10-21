@@ -15,6 +15,10 @@ final class PhotoStore {
 
     func listen(babyID: String) {
         listener?.remove()
+        if DesignPreview.isOn {
+            hasLoaded = true
+            return
+        }
         listener = Self.collection(babyID)
             .order(by: "createdAt", descending: true)
             .addSnapshotListener { [weak self] snapshot, _ in

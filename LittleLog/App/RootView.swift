@@ -37,17 +37,22 @@ struct RootView: View {
 
 struct MainTabView: View {
     @Environment(BabyStore.self) private var store
+    @State private var tab = DesignPreview.isOn ? DesignPreview.screen : "today"
 
     var body: some View {
         if let baby = store.selectedBaby {
-            TabView {
+            TabView(selection: $tab) {
                 TodayView(baby: baby)
+                    .tag("today")
                     .tabItem { Label("Today", systemImage: "sun.max.fill") }
                 TrendsView(baby: baby)
+                    .tag("trends")
                     .tabItem { Label("Trends", systemImage: "chart.bar.fill") }
                 PhotosView(baby: baby)
+                    .tag("photos")
                     .tabItem { Label("Photos", systemImage: "camera.fill") }
                 FamilyView(baby: baby)
+                    .tag("family")
                     .tabItem { Label("Family", systemImage: "pawprint.fill") }
             }
             .celebratesMilestones()

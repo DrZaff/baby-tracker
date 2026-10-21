@@ -18,7 +18,9 @@ struct LittleLogApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if Self.isFirebaseConfigured {
+            if DesignPreview.isOn {
+                DesignPreviewRoot()
+            } else if Self.isFirebaseConfigured {
                 AppContainer()
                     .onOpenURL { url in
                         GIDSignIn.sharedInstance.handle(url)
