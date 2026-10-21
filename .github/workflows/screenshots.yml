@@ -9,7 +9,7 @@ on:
 jobs:
   screenshots:
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +39,7 @@ jobs:
           grep -q "BUILD SUCCEEDED" build.log
 
       - name: Take screenshots
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           brew install coreutils > /dev/null
           t() { gtimeout "$@" || echo "  (timed out or failed: $*)"; }
@@ -62,7 +62,7 @@ jobs:
             echo "::group::$name"
             date; echo "Booting"
             t 300 xcrun simctl boot "$udid"
-            t 300 xcrun simctl bootstatus "$udid"
+            t 1200 xcrun simctl bootstatus "$udid" -b | tail -2
             date; echo "Booted"
             t 30 xcrun simctl status_bar "$udid" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
             t 120 xcrun simctl install "$udid" "$APP"
