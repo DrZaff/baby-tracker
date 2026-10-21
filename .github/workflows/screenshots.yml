@@ -59,7 +59,7 @@ jobs:
           if [ $offset -ge 0 ]; then zone="Etc/GMT+$offset"; else zone="Etc/GMT$offset"; fi
           echo "Time zone for screenshots: $zone"
           export SIMCTL_CHILD_TZ="$zone"
-          screens="today today-report today-timeline trends trends-growth photos family feed tummy diaper growth milestone appointments newAppointment signin"
+          screens="today today-report today-timeline trends trends-growth photos family feed tummy diaper growth milestone appointments newAppointment signin report report-log"
           for pick in "$big" "$small"; do
             name=$(echo "${pick%%|*}" | tr ' ' '-')
             udid="${pick##*|}"

@@ -1,8 +1,7 @@
 import SwiftUI
 import PDFKit
 
-/// Builds a short PDF for the pediatrician: daily averages, growth with WHO percentiles,
-/// milestones, and a feeding and diaper log for the chosen dates.
+/// Builds a short PDF for the pediatrician: daily averages, milestones, and a feeding and diaper log for the chosen dates.
 struct ReportView: View {
     let baby: Baby
 
@@ -21,14 +20,23 @@ struct ReportView: View {
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("useMetric") private var useMetric = false
-    @State private var span: Span = .twoWeeks
-    @State private var customStart = Calendar.current.date(byAdding: .day, value: -13, to: Date()) ?? Date()
-    @State private var customEnd = Date()
+    @State private var span: Span
+    @State private var customStart: Date
+    @State private var customEnd: Date
     @State private var pdfURL: URL?
     /// Changes on every new report, so the preview reloads even when the file name is the same.
     @State private var version = UUID()
     @State private var isWorking = false
     @State private var errorMessage: String?
+
+    init(baby: Baby, span: Span = .twoWeeks,
+         customStart: Date = Calendar.current.date(byAdding: .day, value: -13, to: Date()) ?? Date(),
+         customEnd: Date = Date()) {
+        self.baby = baby
+        _span = State(initialValue: span)
+        _customStart = State(initialValue: customStart)
+        _customEnd = State(initialValue: customEnd)
+    }
 
     private var calendar: Calendar { Calendar.current }
 
@@ -57,7 +65,7 @@ struct ReportView: View {
                 } header: {
                     JungleHeader(title: "Report for \(baby.name)", icon: "🩺")
                 } footer: {
-                    Text("Covers \(range.start.formatted(.dateTime.month(.abbreviated).day())) to \(range.end.formatted(.dateTime.month(.abbreviated).day().year())): daily averages, growth with WHO percentiles, milestones, and a log of every feed and diaper. Share it by email, Messages or AirDrop, or print it.")
+                    Text("Covers \(range.start.formatted(.dateTime.month(.abbreviated).day())) to \(range.end.formatted(.dateTime.month(.abbreviated).day().year())): daily averages, milestones, and a log of every feed and diaper. Share it by email, Messages or AirDrop, or print it.")
                 }
 
                 Section {
@@ -85,8 +93,8 @@ struct ReportView: View {
 
                 if let pdfURL {
                     Section("Preview") {
-                        PDFPreview(url: pdfURL, version: version)
-                            .frame(height: 460)
+                        PDFPreview(url: pdfURL, version: version, page: DesignPreview.scrollTarget == "log" ? 1 : 0)
+                            .frame(height: DesignPreview.isOn ? 600 : 460)
                             .listRowInsets(EdgeInsets())
                     }
                 }
@@ -100,6 +108,7 @@ struct ReportView: View {
             .onChange(of: span) { pdfURL = nil }
             .onChange(of: customStart) { pdfURL = nil }
             .onChange(of: customEnd) { pdfURL = nil }
+            .task { if DesignPreview.isOn { await build() } }
         }
     }
 
@@ -124,6 +133,7 @@ struct ReportView: View {
 struct PDFPreview: UIViewRepresentable {
     let url: URL
     let version: UUID
+    var page = 0
 
     final class Coordinator { var shown: UUID? }
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -139,7 +149,9 @@ struct PDFPreview: UIViewRepresentable {
     func updateUIView(_ view: PDFView, context: Context) {
         guard context.coordinator.shown != version else { return }
         context.coordinator.shown = version
-        view.document = PDFDocument(url: url)
+        let document = PDFDocument(url: url)
+        view.document = document
+        if page > 0, let target = document?.page(at: page) { view.go(to: target) }
     }
 }
 
@@ -170,6 +182,8 @@ struct ReportData {
         self.end = end
         self.metric = metric
         self.growth = growth
+        let endExclusive = calendar.date(byAdding: .day, value: 1, to: end) ?? end
+        let entries = entries.filter { $0.timestamp >= start && $0.timestamp < endExclusive }
         self.milestones = entries.filter { $0.kind == .milestone }.sorted { $0.timestamp < $1.timestamp }
         self.total = DaySummary(entries: entries)
         self.log = entries
@@ -213,7 +227,7 @@ enum ReportColors {
     static let sand = hex(0xFFF7E6)
     static let mint = hex(0xEAF6DF)
     static let ink = hex(0x24312A)
-    static let muted = hex(0x6F7D74)
+    static let muted = hex(0x4F5C54)
 }
 
 enum ReportPDF {
@@ -270,7 +284,8 @@ enum ReportPDF {
             let next = calendar.date(byAdding: .day, value: 1, to: day.date) ?? day.date
             let entries = data.log.filter { $0.timestamp >= day.date && $0.timestamp < next }
             var rows: [ReportLogRow] = [.day(day)]
-            rows += entries.isEmpty ? [.empty] : entries.map { .entry($0) }
+            let items = combined(entries)
+            rows += items.isEmpty ? [.empty] : items.map { .entry(feed: $0.feed, diaper: $0.diaper) }
             for (index, row) in rows.enumerated() {
                 let needsRoom = index == 0 ? 3 : 1
                 if page.count + needsRoom > logRowsPerPage {
@@ -283,11 +298,35 @@ enum ReportPDF {
         if !page.isEmpty { pages.append(page) }
         return pages
     }
+
+    /// A diaper changed within this many minutes of a feed shares the feed's row.
+    static let sameTimeMinutes = 10.0
+
+    /// Puts each diaper on the same row as a feed logged at about the same time.
+    static func combined(_ entries: [LogEntry]) -> [(feed: LogEntry?, diaper: LogEntry?)] {
+        var items: [(feed: LogEntry?, diaper: LogEntry?)] = entries.filter { $0.kind == .feed }.map { ($0, nil) }
+        for diaper in entries where diaper.kind == .diaper {
+            let match = items.indices
+                .filter { items[$0].diaper == nil && items[$0].feed != nil }
+                .map { ($0, abs(items[$0].feed!.timestamp.timeIntervalSince(diaper.timestamp))) }
+                .filter { $0.1 <= sameTimeMinutes * 60 }
+                .min { $0.1 < $1.1 }
+            if let match {
+                items[match.0].diaper = diaper
+            } else {
+                items.append((nil, diaper))
+            }
+        }
+        func time(_ item: (feed: LogEntry?, diaper: LogEntry?)) -> Date {
+            min(item.feed?.timestamp ?? .distantFuture, item.diaper?.timestamp ?? .distantFuture)
+        }
+        return items.sorted { time($0) < time($1) }
+    }
 }
 
 enum ReportLogRow {
     case day(ReportData.Day)
-    case entry(LogEntry)
+    case entry(feed: LogEntry?, diaper: LogEntry?)
     case empty
 }
 
@@ -328,7 +367,7 @@ private struct ReportCard<Content: View>: View {
     }
 }
 
-/// A small colored tile, like the daily report tiles in the app.
+/// One daily average: a colored animal badge, a clear title, the value and a short detail.
 private struct ReportStat: View {
     let title: String
     let value: String
@@ -337,35 +376,41 @@ private struct ReportStat: View {
     let tint: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title.uppercased())
-                .font(.system(size: 7.5, weight: .heavy, design: .rounded))
-                .tracking(0.5)
-                .foregroundStyle(tint)
-            Text(value)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
-                .foregroundStyle(ReportColors.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 7.5, design: .rounded))
-                    .foregroundStyle(ReportColors.muted)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .center, spacing: 10) {
+            Text(animal)
+                .font(.system(size: 18))
+                .frame(width: 34, height: 34)
+                .background(tint.opacity(0.22), in: Circle())
+                .overlay(Circle().strokeBorder(tint.opacity(0.6), lineWidth: 1))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(ReportColors.ink)
+                Text(value)
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(ReportColors.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 8.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(ReportColors.muted)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
+            Spacer(minLength: 0)
         }
-        .padding(8)
-        .frame(maxWidth: .infinity, minHeight: 58, alignment: .topLeading)
-        .background(alignment: .topTrailing) {
-            Text(animal).font(.system(size: 15)).padding(6)
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(LinearGradient(colors: [tint.opacity(0.2), tint.opacity(0.06)], startPoint: .topLeading, endPoint: .bottomTrailing))
-        )
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
         .background(Color.white, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(tint.opacity(0.3), lineWidth: 0.8))
+        .overlay(alignment: .leading) {
+            UnevenRoundedRectangle(topLeadingRadius: 11, bottomLeadingRadius: 11, style: .continuous)
+                .fill(tint)
+                .frame(width: 5)
+        }
+        .overlay(RoundedRectangle(cornerRadius: 11, style: .continuous).strokeBorder(tint.opacity(0.45), lineWidth: 0.8))
     }
 }
 
@@ -379,17 +424,22 @@ private struct ReportHeader: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(subtitle)
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(ReportColors.bark)
                 Text(data.baby.name)
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
                     .foregroundStyle(ReportColors.canopy)
                 Text("\(data.start.formatted(df)) to \(data.end.formatted(df))")
-                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
                     .foregroundStyle(ReportColors.ink)
                 Text(details)
-                    .font(.system(size: 8.5, design: .rounded))
-                    .foregroundStyle(ReportColors.muted)
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ReportColors.ink)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.92), in: Capsule())
+                    .overlay(Capsule().strokeBorder(ReportColors.leaf.opacity(0.35), lineWidth: 0.6))
+                    .padding(.top, 3)
             }
             Spacer()
             ZStack {
@@ -422,55 +472,27 @@ private struct ReportSummaryPage: View {
             ReportHeader(data: data, subtitle: "🩺 Care report for the pediatrician")
 
             ReportCard(title: "Daily averages", icon: "🌿") {
-                let columns = Array(repeating: GridItem(.flexible(), spacing: 7), count: 4)
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 7) {
-                    ReportStat(title: "Feeds", value: String(format: "%.1f / day", perDay(Double(t.feedCount))), detail: "\(t.feedCount) in total", animal: Theme.feedAnimal, tint: ReportColors.hibiscus)
+                let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
+                    ReportStat(title: "Feeds", value: String(format: "%.1f per day", perDay(Double(t.feedCount))), detail: "\(t.feedCount) in total", animal: Theme.feedAnimal, tint: ReportColors.hibiscus)
                     if t.breastSeconds > 0 {
-                        ReportStat(title: "Breastfeeding", value: "\(Units.duration(Int(perDay(Double(t.breastSeconds))))) / day",
+                        ReportStat(title: "Breastfeeding", value: "\(Units.duration(Int(perDay(Double(t.breastSeconds))))) per day",
                                    detail: "Left \(Units.duration(t.breastLeftSeconds)) · right \(Units.duration(t.breastRightSeconds)) total", animal: "🤱", tint: ReportColors.hibiscus)
                     }
                     if t.bottleML > 0 {
-                        ReportStat(title: "Bottle", value: "\(Units.volume(perDay(t.bottleML), metric: data.metric)) / day",
+                        ReportStat(title: "Bottle", value: "\(Units.volume(perDay(t.bottleML), metric: data.metric)) per day",
                                    detail: "Formula \(Units.volume(t.formulaML, metric: data.metric)) · breast milk \(Units.volume(t.breastMilkML, metric: data.metric)) total", animal: Theme.bottleAnimal, tint: ReportColors.mango)
                     }
                     if t.pumpedML > 0 {
-                        ReportStat(title: "Pumped", value: "\(Units.volume(perDay(t.pumpedML), metric: data.metric)) / day", detail: nil, animal: Theme.pumpAnimal, tint: ReportColors.orchid)
+                        ReportStat(title: "Pumped", value: "\(Units.volume(perDay(t.pumpedML), metric: data.metric)) per day", detail: nil, animal: Theme.pumpAnimal, tint: ReportColors.orchid)
                     }
-                    ReportStat(title: "Wet diapers", value: String(format: "%.1f / day", perDay(Double(t.wetCount))), detail: "\(t.wetCount) in total", animal: Theme.diaperAnimal, tint: ReportColors.lagoon)
-                    ReportStat(title: "Dirty diapers", value: String(format: "%.1f / day", perDay(Double(t.dirtyCount))), detail: "\(t.dirtyCount) in total", animal: "💩", tint: ReportColors.bark)
+                    ReportStat(title: "Wet diapers", value: String(format: "%.1f per day", perDay(Double(t.wetCount))), detail: "\(t.wetCount) in total", animal: Theme.diaperAnimal, tint: ReportColors.lagoon)
+                    ReportStat(title: "Dirty diapers", value: String(format: "%.1f per day", perDay(Double(t.dirtyCount))), detail: "\(t.dirtyCount) in total", animal: "💩", tint: ReportColors.bark)
                     if t.tummySeconds > 0 {
-                        ReportStat(title: "Tummy time", value: "\(Units.duration(Int(perDay(Double(t.tummySeconds))))) / day", detail: "\(t.tummyCount) sessions", animal: Theme.tummyAnimal, tint: ReportColors.leaf)
+                        ReportStat(title: "Tummy time", value: "\(Units.duration(Int(perDay(Double(t.tummySeconds))))) per day", detail: "\(t.tummyCount) sessions", animal: Theme.tummyAnimal, tint: ReportColors.leaf)
                     }
                     if t.sleepSeconds > 0 {
-                        ReportStat(title: "Sleep", value: "\(Units.duration(Int(perDay(Double(t.sleepSeconds))))) / day", detail: nil, animal: Theme.sleepAnimal, tint: ReportColors.river)
-                    }
-                }
-            }
-
-            ReportCard(title: "Growth", icon: Theme.weightAnimal, tint: ReportColors.river) {
-                if data.growth.isEmpty {
-                    Text("No measurements logged yet.").font(.system(size: 10)).foregroundStyle(ReportColors.muted)
-                } else {
-                    Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
-                        GridRow {
-                            headerCell("Date"); headerCell("Weight"); headerCell("Length"); headerCell("Head")
-                        }
-                        ForEach(Array(data.growth.suffix(12).enumerated()), id: \.offset) { index, entry in
-                            GridRow {
-                                bodyCell(entry.timestamp.formatted(df), index)
-                                bodyCell(cell(entry.weightGrams.map { Units.weight($0, metric: data.metric) },
-                                              entry.weightGrams.map { data.percentile(.weight, value: $0 / 1000, on: entry.timestamp) }), index)
-                                bodyCell(cell(entry.lengthCm.map { Units.length($0, metric: data.metric) },
-                                              entry.lengthCm.map { data.percentile(.length, value: $0, on: entry.timestamp) }), index)
-                                bodyCell(cell(entry.headCm.map { Units.length($0, metric: data.metric) },
-                                              entry.headCm.map { data.percentile(.head, value: $0, on: entry.timestamp) }), index)
-                            }
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    if data.baby.sex != nil {
-                        Text("Percentiles in brackets are from the WHO Child Growth Standards.")
-                            .font(.system(size: 7.5)).foregroundStyle(ReportColors.muted)
+                        ReportStat(title: "Sleep", value: "\(Units.duration(Int(perDay(Double(t.sleepSeconds))))) per day", detail: nil, animal: Theme.sleepAnimal, tint: ReportColors.river)
                     }
                 }
             }
@@ -493,32 +515,6 @@ private struct ReportSummaryPage: View {
         }
         .padding(.horizontal, 36)
         .padding(.top, 34)
-    }
-
-    private func headerCell(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 9, weight: .heavy, design: .rounded))
-            .foregroundStyle(ReportColors.ink)
-            .padding(.vertical, 5)
-            .padding(.horizontal, 7)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ReportColors.river.opacity(0.22))
-    }
-
-    private func bodyCell(_ text: String, _ index: Int) -> some View {
-        Text(text)
-            .font(.system(size: 9, design: .rounded))
-            .foregroundStyle(ReportColors.ink)
-            .padding(.vertical, 4)
-            .padding(.horizontal, 7)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(index % 2 == 0 ? Color.white : ReportColors.river.opacity(0.06))
-    }
-
-    private func cell(_ value: String?, _ percentile: String?) -> String {
-        guard let value else { return "—" }
-        guard let percentile, !percentile.isEmpty else { return value }
-        return "\(value) (\(percentile))"
     }
 }
 
@@ -607,18 +603,21 @@ private struct ReportLogPage: View {
                 .foregroundStyle(ReportColors.muted)
                 .padding(.horizontal, 8)
                 .frame(maxWidth: .infinity, minHeight: 18, alignment: .leading)
-        case .entry(let entry):
+        case .entry(let feed, let diaperEntry):
+            let time = feed?.timestamp ?? diaperEntry?.timestamp ?? day0
             HStack(spacing: 0) {
-                cell(entry.timestamp.formatted(.dateTime.month(.defaultDigits).day()), 0)
-                cell(entry.timestamp.formatted(date: .omitted, time: .shortened), 1)
-                cell(amount(entry), 2)
-                cell(feedType(entry), 3)
-                cell(diaper(entry), 4)
+                cell(time.formatted(.dateTime.month(.defaultDigits).day()), 0)
+                cell(time.formatted(date: .omitted, time: .shortened), 1)
+                cell(feed.map { amount($0) } ?? "—", 2)
+                cell(feed.map { feedType($0) } ?? "—", 3)
+                cell(diaperEntry.map { diaper($0) } ?? "—", 4)
             }
             .frame(height: 19)
             .background(shaded ? ReportColors.sand.opacity(0.7) : Color.white)
         }
     }
+
+    private var day0: Date { data.start }
 
     private func cell(_ text: String, _ column: Int) -> some View {
         Text(text)

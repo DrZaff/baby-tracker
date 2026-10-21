@@ -180,6 +180,11 @@ struct DesignPreviewRoot: View {
         case "milestone": NavigationStack { MilestoneFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }
         case "appointments": AppointmentsView(baby: baby)
         case "newAppointment": NavigationStack { AppointmentFormView(baby: baby, existing: nil, defaultDate: Date()) }
+        case "report", "report-log":
+            // A custom range that ends before today, to check the report follows the chosen dates.
+            ReportView(baby: baby, span: .custom,
+                       customStart: Calendar.current.date(byAdding: .day, value: -10, to: Date()) ?? Date(),
+                       customEnd: Calendar.current.date(byAdding: .day, value: -4, to: Date()) ?? Date())
         case "babyForm": NavigationStack { BabyFormView(mode: .create, isFirstBaby: true) }
         default: MainTabView()
         }
