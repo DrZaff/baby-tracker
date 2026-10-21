@@ -78,6 +78,9 @@ jobs:
               t 30 xcrun simctl io "$udid" screenshot "shots/$name-$2-$1.png" > /dev/null 2>&1
             }
             t 30 xcrun simctl ui "$udid" appearance light
+            # The first launch after installing is slow; warm up before taking pictures.
+            t 60 xcrun simctl launch "$udid" "$BUNDLE" -designPreview -screen today > /dev/null
+            sleep 20
             for s in $screens; do shoot "$s" light; done
             t 30 xcrun simctl ui "$udid" appearance dark
             for s in today today-report trends feed appointments; do shoot "$s" dark; done
