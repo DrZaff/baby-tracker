@@ -49,6 +49,7 @@ targets:
         UIBackgroundModes: [remote-notification]
         ITSAppUsesNonExemptEncryption: false
         NSPhotoLibraryUsageDescription: Choose photos of your baby to share with your family.
+        NSCalendarsWriteOnlyAccessUsageDescription: Add appointments to your calendar.
         NSSupportsLiveActivities: true
         LittleLogSharedKeychainGroup: $(AppIdentifierPrefix)$(APP_BUNDLE_ID).shared
         CFBundleURLTypes:

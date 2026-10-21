@@ -10,6 +10,7 @@ struct AppointmentsView: View {
     @State private var listener = AppointmentsListener()
     @State private var editing: Appointment?
     @State private var adding = false
+    @State private var appleEvent: Appointment?
 
     private var calendar: Calendar { Calendar.current }
 
@@ -86,6 +87,9 @@ struct AppointmentsView: View {
                             }
                         }
                         .contextMenu {
+                            Button { appleEvent = appointment } label: {
+                                Label("Add to Apple Calendar", systemImage: "calendar.badge.plus")
+                            }
                             if let url = appointment.googleCalendarURL(babyName: baby.name) {
                                 Link(destination: url) {
                                     Label("Add to Google Calendar", systemImage: "calendar.badge.plus")
@@ -118,6 +122,10 @@ struct AppointmentsView: View {
                 NavigationStack {
                     AppointmentFormView(baby: baby, existing: appointment, defaultDate: appointment.start)
                 }
+            }
+            .sheet(item: $appleEvent) { appointment in
+                AppleCalendarSheet(appointment: appointment, babyName: baby.name) { appleEvent = nil }
+                    .ignoresSafeArea()
             }
             .task(id: "\(baby.babyID)|\(interval.start.timeIntervalSince1970)") {
                 listener.listen(babyID: baby.babyID, from: interval.start, to: interval.end)
@@ -309,8 +317,10 @@ struct AppointmentFormView: View {
     @State private var duration: Int
     @State private var location: String
     @State private var notes: String
-    @State private var addToMyCalendar = false
+    @AppStorage("appointmentCalendar") private var savedChoice = CalendarChoice.none.rawValue
+    @State private var calendarChoice: CalendarChoice = .none
     @State private var invited: Set<String> = []
+    @State private var appleEvent: Appointment?
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
 
@@ -325,6 +335,9 @@ struct AppointmentFormView: View {
         _duration = State(initialValue: existing?.durationMinutes ?? 30)
         _location = State(initialValue: existing?.location ?? "")
         _notes = State(initialValue: existing?.notes ?? "")
+        // Remember the calendar picked last time for new appointments.
+        let saved = CalendarChoice(rawValue: UserDefaults.standard.string(forKey: "appointmentCalendar") ?? "") ?? .none
+        _calendarChoice = State(initialValue: existing == nil ? saved : .none)
     }
 
     private var draft: Appointment {
@@ -348,7 +361,6 @@ struct AppointmentFormView: View {
         baby.memberEmails.filter { $0.lowercased() != auth.email }.sorted()
     }
 
-    private var opensCalendar: Bool { addToMyCalendar || !invited.isEmpty }
 
     var body: some View {
         Form {
@@ -391,26 +403,40 @@ struct AppointmentFormView: View {
             }
 
             Section {
-                CheckRow(title: "Add to my Google Calendar", subtitle: nil, isOn: $addToMyCalendar)
-                ForEach(otherCaregivers, id: \.self) { email in
-                    CheckRow(
-                        title: "Invite \(email)",
-                        subtitle: existing?.invitedEmails?.contains(email) == true ? "Already invited" : nil,
-                        isOn: Binding(
-                            get: { invited.contains(email) },
-                            set: { checked in
-                                if checked { invited.insert(email) } else { invited.remove(email) }
-                                if checked { addToMyCalendar = true }
-                            }
-                        )
-                    )
+                Picker("Add to my calendar", selection: $calendarChoice) {
+                    ForEach(CalendarChoice.allCases) { Text($0.label).tag($0) }
                 }
+                .pickerStyle(.segmented)
+                .padding(.vertical, 4)
             } header: {
-                Text("Google Calendar")
+                Text("Add to my calendar")
             } footer: {
-                Text(otherCaregivers.isEmpty
-                     ? "Everyone who shares \(baby.name) sees this appointment in Little Log. Invite caregivers from the Family tab to send them calendar invites too."
-                     : "Everyone who shares \(baby.name) sees this appointment in Little Log either way. Checked caregivers also get an invite at their Gmail: after you tap Save here, Google Calendar opens with them added, and they're sent the invite when you save it there.")
+                switch calendarChoice {
+                case .none: Text("It's saved in Little Log for everyone either way.")
+                case .apple: Text("After you tap Save, the iPhone's calendar opens so you can pick which calendar to add it to.")
+                case .google: Text("After you tap Save, Google Calendar opens with the appointment filled in.")
+                }
+            }
+
+            if !otherCaregivers.isEmpty {
+                Section {
+                    ForEach(otherCaregivers, id: \.self) { email in
+                        CheckRow(
+                            title: email,
+                            subtitle: existing?.invitedEmails?.contains(email) == true ? "Already invited" : nil,
+                            isOn: Binding(
+                                get: { invited.contains(email) },
+                                set: { checked in
+                                    if checked { invited.insert(email) } else { invited.remove(email) }
+                                }
+                            )
+                        )
+                    }
+                } header: {
+                    Text("Send calendar invites")
+                } footer: {
+                    Text("Everyone who shares \(baby.name) sees this appointment in Little Log. Checked caregivers also get an email invite they can accept into any calendar. It's sent through Google Calendar, which opens with them added after you tap Save; tap Save there to send.")
+                }
             }
 
             if existing != nil {
@@ -434,16 +460,26 @@ struct AppointmentFormView: View {
                     do {
                         let appointment = draft
                         try AppointmentRepository.save(appointment, babyID: baby.babyID, auth: auth)
-                        if opensCalendar, let url = appointment.googleCalendarURL(babyName: baby.name, guests: invited.sorted()) {
-                            openURL(url)
+                        if existing == nil { savedChoice = calendarChoice.rawValue }
+                        if calendarChoice == .apple {
+                            // Google (for invites) opens after the Apple calendar sheet closes.
+                            appleEvent = appointment
+                        } else {
+                            finish(appointment)
                         }
-                        dismiss()
                     } catch {
                         errorMessage = error.localizedDescription
                     }
                 }
                 .fontWeight(.semibold)
             }
+        }
+        .sheet(item: $appleEvent) { appointment in
+            AppleCalendarSheet(appointment: appointment, babyName: baby.name) {
+                appleEvent = nil
+                finish(appointment)
+            }
+            .ignoresSafeArea()
         }
         .confirmationDialog("Delete this appointment for everyone?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) {
@@ -456,6 +492,16 @@ struct AppointmentFormView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+
+    /// Opens Google Calendar when it was picked or caregivers are being invited, then closes the form.
+    private func finish(_ appointment: Appointment) {
+        let guests = invited.sorted()
+        if calendarChoice == .google || !guests.isEmpty,
+           let url = appointment.googleCalendarURL(babyName: baby.name, guests: guests) {
+            openURL(url)
+        }
+        dismiss()
     }
 }
 
