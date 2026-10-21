@@ -18,6 +18,7 @@ struct DaySummary {
     var latestWeightGrams: Double?
     var latestLengthCm: Double?
     var latestHeadCm: Double?
+    var vitaminD = false
     var sleepCount = 0
     var sleepSeconds = 0
     var milestones: [String] = []
@@ -33,8 +34,15 @@ struct DaySummary {
                 breastLeftSeconds += entry.breastLeftSeconds ?? 0
                 breastRightSeconds += entry.breastRightSeconds ?? 0
                 if let ml = entry.bottleML {
-                    if entry.bottleContent == .breastMilk { breastMilkML += ml } else { formulaML += ml }
+                    switch entry.bottleContent {
+                    case .breastMilk: breastMilkML += ml
+                    case .mix:
+                        formulaML += entry.bottleFormulaML ?? 0
+                        breastMilkML += entry.bottleBreastMilkML ?? 0
+                    default: formulaML += ml
+                    }
                 }
+                if entry.vitaminD == true { vitaminD = true }
                 if entry.hasPump {
                     pumpCount += 1
                     pumpSeconds += entry.pumpSeconds

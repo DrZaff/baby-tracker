@@ -113,6 +113,13 @@ struct FamilyView: View {
                     } label: {
                         Label { Text("Feed reminder") } icon: { Text("⏰") }
                     }
+                    Toggle(isOn: Binding(
+                        get: { baby.vitaminDReminder == true },
+                        set: { store.setVitaminDReminder($0, for: baby) }
+                    )) {
+                        Label { Text("Vitamin D reminder") } icon: { Text("☀️") }
+                    }
+                    .tint(Theme.sunshine)
                     Button("Notification settings") {
                         if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -121,7 +128,7 @@ struct FamilyView: View {
                 } header: {
                     JungleHeader(title: "Settings", icon: "🌿")
                 } footer: {
-                    Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long.")
+                    Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long. The vitamin D reminder adds a daily checkbox when logging a feed and shows how often it was given in Trends.")
                 }
 
                 Section {

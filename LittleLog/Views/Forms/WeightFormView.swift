@@ -14,6 +14,8 @@ struct WeightFormView: View {
     @State private var kilograms: Double?
     @State private var length: Double?
     @State private var head: Double?
+    @State private var lengthMetric: Bool
+    @State private var headMetric: Bool
     @State private var notes: String
 
     init(babyID: String, existing: LogEntry?, defaultDate: Date) {
@@ -28,8 +30,12 @@ struct WeightFormView: View {
             _ounces = State(initialValue: oz)
             _kilograms = State(initialValue: (grams / 10).rounded() / 100)
         }
-        _length = State(initialValue: existing?.lengthCm.map { Units.lengthValue($0, metric: metric) })
-        _head = State(initialValue: existing?.headCm.map { Units.lengthValue($0, metric: metric) })
+        let lengthMetric = existing?.lengthMetric ?? metric
+        let headMetric = existing?.headMetric ?? metric
+        _lengthMetric = State(initialValue: lengthMetric)
+        _headMetric = State(initialValue: headMetric)
+        _length = State(initialValue: existing?.lengthCm.map { Units.lengthValue($0, metric: lengthMetric) })
+        _head = State(initialValue: existing?.headCm.map { Units.lengthValue($0, metric: headMetric) })
         _notes = State(initialValue: existing?.notes ?? "")
     }
 
@@ -80,8 +86,8 @@ struct WeightFormView: View {
                 Text("\(Theme.weightAnimal) Weight")
             }
             Section {
-                LengthField(title: "Length", value: $length, metric: $metric)
-                LengthField(title: "Head size", value: $head, metric: $metric)
+                LengthField(title: "Length", value: $length, metric: $lengthMetric)
+                LengthField(title: "Head size", value: $head, metric: $headMetric)
             } header: {
                 Text("🦒 Length and head")
             } footer: {
@@ -95,15 +101,19 @@ struct WeightFormView: View {
             }
         }
         .entryFormToolbar(existing == nil ? "Log growth" : "Edit growth", canSave: canSave, save: save)
-        .onChange(of: metric) { old, new in
-            // Carry every measurement over to the other units.
+        // Each measurement keeps its value when its own units switch.
+        .onChange(of: metric) { old, _ in
             if let g = grams(metric: old) {
                 let (lb, oz) = Units.poundsAndOunces(g)
                 pounds = lb
                 ounces = oz
                 kilograms = (g / 10).rounded() / 100
             }
+        }
+        .onChange(of: lengthMetric) { old, new in
             length = centimetres(length, metric: old).map { Units.lengthValue($0, metric: new) }
+        }
+        .onChange(of: headMetric) { old, new in
             head = centimetres(head, metric: old).map { Units.lengthValue($0, metric: new) }
         }
     }
@@ -112,9 +122,11 @@ struct WeightFormView: View {
         var entry = existing ?? LogEntry(kind: .weight, createdByUid: auth.uid, createdByName: auth.displayName)
         entry.timestamp = time
         entry.weightGrams = grams
-        entry.lengthCm = centimetres(length, metric: metric)
-        entry.headCm = centimetres(head, metric: metric)
+        entry.lengthCm = centimetres(length, metric: lengthMetric)
+        entry.headCm = centimetres(head, metric: headMetric)
         entry.metric = metric
+        entry.lengthMetric = entry.lengthCm == nil ? nil : lengthMetric
+        entry.headMetric = entry.headCm == nil ? nil : headMetric
         entry.notes = notes.trimmedOrNil
         try EntryRepository.save(entry, babyID: babyID, auth: auth, metric: metric)
     }

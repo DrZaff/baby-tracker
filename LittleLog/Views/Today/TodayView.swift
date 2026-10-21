@@ -7,6 +7,8 @@ struct TodayView: View {
     @Environment(AuthService.self) private var auth
     @AppStorage("useMetric") private var useMetric = false
     @State private var justLogged: String?
+    @State private var todaysAppointments = AppointmentsListener()
+    @State private var showingAppointments = false
     @State private var day = Calendar.current.startOfDay(for: Date())
     @State private var dayEntries = EntriesListener()
     @State private var recent = EntriesListener()
@@ -25,6 +27,14 @@ struct TodayView: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 4, trailing: 4))
 
+                if isToday && !todaysAppointments.appointments.isEmpty {
+                    Section {
+                        TodayAppointmentsCard(appointments: todaysAppointments.appointments) { showingAppointments = true }
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                }
+
                 if let sleep = recent.entries.first(where: { $0.isSleeping }) {
                     Section {
                         SleepingBanner(entry: sleep) { wakeUp(sleep) }
@@ -42,7 +52,9 @@ struct TodayView: View {
                 }
 
                 Section {
-                    QuickAddGrid { template in sheet = .new(template) }
+                    QuickAddGrid { template in
+                        if template == .appointment { showingAppointments = true } else { sheet = .new(template) }
+                    }
                         .padding(.vertical, 6)
                     if isToday, let bottle = recent.entries.first(where: { $0.hasBottle }) {
                         RepeatBottleButton(entry: bottle, justLogged: justLogged) { repeatBottle(bottle) }
@@ -101,6 +113,13 @@ struct TodayView: View {
             .sheet(item: $sheet) { sheet in
                 EntryEditor(babyID: baby.babyID, sheet: sheet, defaultDate: defaultEntryDate(for: day))
             }
+            .sheet(isPresented: $showingAppointments) {
+                AppointmentsView(baby: baby)
+            }
+            .task(id: "\(baby.babyID)|\(calendar.startOfDay(for: Date()).timeIntervalSince1970)") {
+                let today = calendar.startOfDay(for: Date())
+                todaysAppointments.listen(babyID: baby.babyID, from: today, to: calendar.date(byAdding: .day, value: 1, to: today) ?? today)
+            }
             .task(id: "\(baby.babyID)|\(day.timeIntervalSince1970)") {
                 dayEntries.listen(babyID: baby.babyID, from: day, to: dayEnd)
             }
@@ -137,6 +156,8 @@ struct TodayView: View {
         var entry = LogEntry(kind: .feed, createdByUid: auth.uid, createdByName: auth.displayName)
         entry.bottleML = bottle.bottleML
         entry.bottleContent = bottle.bottleContent
+        entry.bottleFormulaML = bottle.bottleFormulaML
+        entry.bottleBreastMilkML = bottle.bottleBreastMilkML
         entry.metric = bottle.metric
         try? EntryRepository.save(entry, babyID: baby.babyID, auth: auth, metric: bottle.metric ?? useMetric)
         justLogged = UUID().uuidString
@@ -283,6 +304,12 @@ struct DailyReportGrid: View {
                 title: "Diapers", value: "\(summary.diaperCount)", animal: Theme.diaperAnimal, tint: Theme.diaper,
                 lines: ["\(summary.wetCount) wet · \(summary.dirtyCount) dirty"]
             )
+            if baby.vitaminDReminder == true {
+                ReportTile(
+                    title: "Vitamin D", value: summary.vitaminD ? "Given ✓" : "Not yet", animal: "☀️", tint: Theme.mango,
+                    lines: summary.vitaminD ? [] : ["Check it off when logging a feed"]
+                )
+            }
             if summary.sleepCount > 0 {
                 ReportTile(
                     title: "Sleep", value: Units.duration(summary.sleepSeconds), animal: Theme.sleepAnimal, tint: Theme.sleep,

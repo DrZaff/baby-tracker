@@ -77,6 +77,18 @@ exports.onEntryWritten = onDocumentWritten("babies/{babyId}/entries/{entryId}", 
   await notifyCaregivers(event.params.babyId, actorUid, body);
 });
 
+exports.onAppointmentWritten = onDocumentWritten("babies/{babyId}/appointments/{appointmentId}", async (event) => {
+  const after = event.data && event.data.after;
+  if (!after || !after.exists) return; // Deleted
+  const appointment = after.data();
+  const isNew = !event.data.before.exists;
+  const actorUid = isNew ? appointment.createdByUid : appointment.updatedByUid || appointment.createdByUid;
+  const actorName = isNew ? appointment.createdByName : appointment.updatedByName || appointment.createdByName;
+  const what = appointment.summary || "an appointment";
+  const body = isNew ? `🦉 ${actorName} added ${what}` : `🦉 ${actorName} updated ${what}`;
+  await notifyCaregivers(event.params.babyId, actorUid, body);
+});
+
 exports.onPhotoCreated = onDocumentCreated("babies/{babyId}/photos/{photoId}", async (event) => {
   const photo = event.data && event.data.data();
   if (!photo) return;

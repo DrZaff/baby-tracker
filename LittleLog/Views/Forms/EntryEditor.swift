@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum EntryTemplate: String, CaseIterable, Identifiable {
-    case feed, sleep, diaper, weight, milestone, daycare
+    case feed, sleep, diaper, weight, milestone, appointment
     var id: String { rawValue }
 
     var label: String {
@@ -11,7 +11,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
         case .diaper: return "Diaper"
         case .weight: return "Growth"
         case .milestone: return "Milestone"
-        case .daycare: return "Daycare"
+        case .appointment: return "Appointments"
         }
     }
 
@@ -22,7 +22,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
         case .diaper: return Theme.diaperAnimal
         case .weight: return Theme.weightAnimal
         case .milestone: return Theme.milestoneAnimal
-        case .daycare: return Theme.daycareAnimal
+        case .appointment: return "🦉"
         }
     }
 
@@ -33,7 +33,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
         case .diaper: return Theme.diaper
         case .weight: return Theme.weight
         case .milestone: return Theme.milestone
-        case .daycare: return Theme.daycare
+        case .appointment: return Theme.river
         }
     }
 }
@@ -66,7 +66,7 @@ struct EntryEditor: View {
                 case .diaper: DiaperFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .weight: WeightFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .milestone: MilestoneFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
-                case .daycare: DaycareFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
+                case .appointment: EmptyView() // Opens the appointments screen instead; see TodayView.
                 }
             case .edit(let entry):
                 switch entry.kind {

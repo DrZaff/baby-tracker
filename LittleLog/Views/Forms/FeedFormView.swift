@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FeedFormView: View {
     @Environment(AuthService.self) private var auth
+    @Environment(BabyStore.self) private var store
 
     let babyID: String
     let existing: LogEntry?
@@ -15,6 +16,11 @@ struct FeedFormView: View {
     @State private var breastRight: SideTimer
     @State private var bottleAmount: Double?
     @State private var bottleContent: BottleContent
+    @State private var mixFormula: Double?
+    @State private var mixBreastMilk: Double?
+    @State private var vitaminD: Bool
+    /// Vitamin D was already logged in another entry that day, so the checkbox is hidden.
+    @State private var vitaminDGivenElsewhere = false
     @State private var pumpLeft: SideTimer
     @State private var pumpRight: SideTimer
     @State private var pumpedAmount: Double?
@@ -33,15 +39,30 @@ struct FeedFormView: View {
         _breastRight = State(initialValue: SideTimer(seconds: existing?.breastRightSeconds))
         _bottleAmount = State(initialValue: existing?.bottleML.map { Units.volumeValue($0, metric: metric) })
         _bottleContent = State(initialValue: existing?.bottleContent ?? .formula)
+        _mixFormula = State(initialValue: existing?.bottleFormulaML.map { Units.volumeValue($0, metric: metric) })
+        _mixBreastMilk = State(initialValue: existing?.bottleBreastMilkML.map { Units.volumeValue($0, metric: metric) })
+        _vitaminD = State(initialValue: existing?.vitaminD == true)
         _pumpLeft = State(initialValue: SideTimer(seconds: existing?.pumpLeftSeconds))
         _pumpRight = State(initialValue: SideTimer(seconds: existing?.pumpRightSeconds))
         _pumpedAmount = State(initialValue: existing?.pumpedML.map { Units.volumeValue($0, metric: metric) })
         _notes = State(initialValue: existing?.notes ?? "")
     }
 
+    private var vitaminDEnabled: Bool {
+        store.babies.first { $0.id == babyID }?.vitaminDReminder == true
+    }
+
+    /// Bottle amount in the units shown; for a mix, formula plus breast milk.
+    private var bottleTotal: Double? {
+        guard bottleContent == .mix else { return bottleAmount }
+        let total = (mixFormula ?? 0) + (mixBreastMilk ?? 0)
+        return total > 0 ? total : nil
+    }
+
     private var hasContent: Bool {
-        (includeBreast && (breastLeft.elapsed() > 0 || breastRight.elapsed() > 0 || breastLeft.isRunning || breastRight.isRunning))
-            || (includeBottle && (bottleAmount ?? 0) > 0)
+        (vitaminD && vitaminDEnabled)
+            || (includeBreast && (breastLeft.elapsed() > 0 || breastRight.elapsed() > 0 || breastLeft.isRunning || breastRight.isRunning))
+            || (includeBottle && (bottleTotal ?? 0) > 0)
             || (includePump && (pumpLeft.elapsed() > 0 || pumpRight.elapsed() > 0 || pumpLeft.isRunning || pumpRight.isRunning || (pumpedAmount ?? 0) > 0))
     }
 
@@ -74,7 +95,13 @@ struct FeedFormView: View {
                         ForEach(BottleContent.allCases) { Text($0.label).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    AmountField(title: "Amount", value: $bottleAmount, metric: $metric)
+                    if bottleContent == .mix {
+                        AmountField(title: "Formula", value: $mixFormula, metric: $metric)
+                        AmountField(title: "Breast milk", value: $mixBreastMilk, metric: $metric)
+                        LabeledContent("Total", value: bottleTotal.map { "\(Units.volume(Units.millilitres(from: $0, metric: metric), metric: metric))" } ?? "—")
+                    } else {
+                        AmountField(title: "Amount", value: $bottleAmount, metric: $metric)
+                    }
                 }
             }
 
@@ -87,6 +114,17 @@ struct FeedFormView: View {
                     SideTimerRow(label: "Left", tint: Theme.pump, timer: $pumpLeft)
                     SideTimerRow(label: "Right", tint: Theme.pump, timer: $pumpRight)
                     AmountField(title: "Amount pumped", value: $pumpedAmount, metric: $metric)
+                }
+            }
+
+            if vitaminDEnabled && (!vitaminDGivenElsewhere || vitaminD) {
+                Section {
+                    Toggle(isOn: $vitaminD) {
+                        Label { Text("Vitamin D given today").fontWeight(.semibold) } icon: { Text("☀️") }
+                    }
+                    .tint(Theme.sunshine)
+                } footer: {
+                    Text("Check this once a day. It disappears for the rest of the day once logged.")
                 }
             }
 
@@ -105,7 +143,19 @@ struct FeedFormView: View {
             // Keep the same amount when switching units.
             bottleAmount = bottleAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
             pumpedAmount = pumpedAmount.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
+            mixFormula = mixFormula.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
+            mixBreastMilk = mixBreastMilk.map { Units.volumeValue(Units.millilitres(from: $0, metric: old), metric: new) }
         }
+        .task(id: Calendar.current.startOfDay(for: time)) { await checkVitaminD() }
+    }
+
+    /// Hides the vitamin D checkbox if someone already logged it that day.
+    private func checkVitaminD() async {
+        guard vitaminDEnabled else { return }
+        let day = Calendar.current.startOfDay(for: time)
+        let next = Calendar.current.date(byAdding: .day, value: 1, to: day) ?? day
+        let entries = (try? await EntryRepository.fetch(babyID: babyID, from: day, to: next)) ?? []
+        vitaminDGivenElsewhere = entries.contains { $0.vitaminD == true && $0.id != existing?.id }
     }
 
     /// Shows the running timer on the lock screen and in the Dynamic Island.
@@ -149,13 +199,20 @@ struct FeedFormView: View {
             }
         }
 
-        if includeBottle, let amount = bottleAmount, amount > 0 {
+        entry.bottleFormulaML = nil
+        entry.bottleBreastMilkML = nil
+        if includeBottle, let amount = bottleTotal, amount > 0 {
             entry.bottleML = Units.millilitres(from: amount, metric: metric)
             entry.bottleContent = bottleContent
+            if bottleContent == .mix {
+                entry.bottleFormulaML = Units.millilitres(from: mixFormula ?? 0, metric: metric)
+                entry.bottleBreastMilkML = Units.millilitres(from: mixBreastMilk ?? 0, metric: metric)
+            }
         } else {
             entry.bottleML = nil
             entry.bottleContent = nil
         }
+        entry.vitaminD = vitaminDEnabled && vitaminD ? true : nil
 
         let pl = includePump ? pumpLeft.seconds : 0
         let pr = includePump ? pumpRight.seconds : 0

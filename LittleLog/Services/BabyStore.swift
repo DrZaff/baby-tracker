@@ -78,6 +78,14 @@ final class BabyStore {
         ])
     }
 
+    func setVitaminDReminder(_ on: Bool, for baby: Baby) {
+        var data: [String: Any] = ["vitaminDReminder": on]
+        if on && baby.vitaminDSince == nil {
+            data["vitaminDSince"] = Timestamp(date: Calendar.current.startOfDay(for: Date()))
+        }
+        db.collection("babies").document(baby.babyID).updateData(data)
+    }
+
     func addCaregiver(email: String, to baby: Baby) {
         let cleaned = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !cleaned.isEmpty else { return }

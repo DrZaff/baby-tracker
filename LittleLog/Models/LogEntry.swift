@@ -6,9 +6,15 @@ enum EntryKind: String, Codable, CaseIterable {
 }
 
 enum BottleContent: String, Codable, CaseIterable, Identifiable {
-    case formula, breastMilk
+    case formula, breastMilk, mix
     var id: String { rawValue }
-    var label: String { self == .formula ? "Formula" : "Breast milk" }
+    var label: String {
+        switch self {
+        case .formula: return "Formula"
+        case .breastMilk: return "Breast milk"
+        case .mix: return "Mix"
+        }
+    }
 }
 
 enum DaycareEvent: String, Codable, CaseIterable, Identifiable {
@@ -46,9 +52,14 @@ struct LogEntry: Identifiable, Codable, Equatable {
     var breastLastSide: BreastSide?
     var bottleML: Double?
     var bottleContent: BottleContent?
+    /// For a mixed bottle, how much of bottleML was formula and how much breast milk.
+    var bottleFormulaML: Double?
+    var bottleBreastMilkML: Double?
     var pumpLeftSeconds: Int?
     var pumpRightSeconds: Int?
     var pumpedML: Double?
+    /// Daily vitamin D drops, logged with a feed.
+    var vitaminD: Bool?
 
     // Diaper
     var wet: Bool?
@@ -63,6 +74,9 @@ struct LogEntry: Identifiable, Codable, Equatable {
     var weightGrams: Double?
     var lengthCm: Double?
     var headCm: Double?
+    /// Units length and head size were entered in, when different from `metric`.
+    var lengthMetric: Bool?
+    var headMetric: Bool?
 
     // Milestone
     var title: String?
@@ -101,6 +115,7 @@ extension LogEntry {
         switch kind {
         case .feed:
             if isPumpOnly { return "Pump" }
+            if !hasBreast && !hasBottle && !hasPump && vitaminD == true { return "Vitamin D" }
             var parts: [String] = []
             if hasBreast { parts.append("Breast") }
             if hasBottle { parts.append("Bottle") }
@@ -134,7 +149,13 @@ extension LogEntry {
                 parts.append("Breast " + sides.joined(separator: " · "))
             }
             if let ml = bottleML, ml > 0 {
-                parts.append("\(Units.volume(ml, metric: metric)) \((bottleContent ?? .formula).label.lowercased())")
+                if bottleContent == .mix {
+                    let f = Units.volume(bottleFormulaML ?? 0, metric: metric)
+                    let b = Units.volume(bottleBreastMilkML ?? 0, metric: metric)
+                    parts.append("\(Units.volume(ml, metric: metric)) mix (\(f) formula, \(b) breast milk)")
+                } else {
+                    parts.append("\(Units.volume(ml, metric: metric)) \((bottleContent ?? .formula).label.lowercased())")
+                }
             }
             if hasPump {
                 var sides: [String] = []
@@ -144,6 +165,7 @@ extension LogEntry {
                 if let ml = pumpedML, ml > 0 { text += sides.isEmpty ? Units.volume(ml, metric: metric) : " (\(Units.volume(ml, metric: metric)))" }
                 parts.append(text)
             }
+            if vitaminD == true { parts.append("☀️ vitamin D") }
         case .diaper:
             if dirty == true {
                 let stool = [stoolColor, stoolConsistency].compactMap { $0?.lowercased() }
@@ -157,8 +179,8 @@ extension LogEntry {
             }
         case .weight:
             if let g = weightGrams { parts.append(Units.weight(g, metric: metric)) }
-            if let cm = lengthCm { parts.append("\(Units.length(cm, metric: metric)) long") }
-            if let cm = headCm { parts.append("head \(Units.length(cm, metric: metric))") }
+            if let cm = lengthCm { parts.append("\(Units.length(cm, metric: lengthMetric ?? metric)) long") }
+            if let cm = headCm { parts.append("head \(Units.length(cm, metric: headMetric ?? metric))") }
         case .milestone:
             break
         case .daycare:
