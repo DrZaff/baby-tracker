@@ -278,10 +278,12 @@ struct AppointmentRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if let location = appointment.location?.trimmedOrNil {
-                    Label(location, systemImage: "mappin.and.ellipse")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                        Text(location).lineLimit(1)
+                    }
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 }
                 if let notes = appointment.notes?.trimmedOrNil {
                     Text(notes).font(.footnote).foregroundStyle(.secondary).italic().lineLimit(2)

@@ -63,24 +63,28 @@ struct WeightFormView: View {
                 DatePicker("Date", selection: $time)
             }
             Section {
-                HStack {
+                HStack(spacing: 6) {
+                    Text("Weight")
+                    Spacer()
                     if metric {
                         TextField("0.00", value: $kilograms, format: .number)
                             .keyboardType(.decimalPad)
-                            .font(.title2)
-                        Text("kg").foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 80)
                     } else {
                         TextField("0", value: $pounds, format: .number)
                             .keyboardType(.numberPad)
-                            .font(.title2)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 36)
                         Text("lb").foregroundStyle(.secondary)
                         TextField("0", value: $ounces, format: .number)
                             .keyboardType(.decimalPad)
-                            .font(.title2)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 44)
                         Text("oz").foregroundStyle(.secondary)
                     }
-                    Spacer()
                     UnitSwitch(options: ["lb", "kg"], metric: $metric)
+                        .padding(.leading, 4)
                 }
             } header: {
                 Text("\(Theme.weightAnimal) Weight")

@@ -24,7 +24,7 @@ struct TummyTimeFormView: View {
         Form {
             Section {
                 DatePicker("Started", selection: $start)
-                SideTimerRow(label: Theme.tummyAnimal, tint: Theme.tummy, timer: $timer) {
+                SideTimerRow(label: "Time", tint: Theme.tummy, timer: $timer) {
                     // Starting the timer from zero means the session starts now.
                     if timer.seconds == 0 && existing == nil { start = Date() }
                 }
