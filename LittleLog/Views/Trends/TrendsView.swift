@@ -103,11 +103,13 @@ struct TrendsView: View {
                     ChartCard(
                         title: "Feeds", subtitle: perLabel, unit: bucketUnit, valueFormat: "%.1f",
                         animal: Theme.feedAnimal,
+                        colors: [Theme.feed],
                         points: points([("Feeds", { Double($0.feedCount) })])
                     )
                     ChartCard(
                         title: "Breastfeeding", subtitle: "minutes \(perLabel)", unit: bucketUnit, valueFormat: "%.0f",
                         animal: "🤱",
+                        colors: [Theme.feed, Theme.mango],
                         points: points([
                             ("Left", { Double($0.breastLeftSeconds) / 60 }),
                             ("Right", { Double($0.breastRightSeconds) / 60 }),
@@ -116,6 +118,7 @@ struct TrendsView: View {
                     ChartCard(
                         title: "Bottle", subtitle: "\(volumeUnit) \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
                         animal: Theme.bottleAnimal,
+                        colors: [Theme.bottle, Theme.hibiscus],
                         points: points([
                             ("Formula", { $0.formulaML * volumeScale }),
                             ("Breast milk", { $0.breastMilkML * volumeScale }),
@@ -124,11 +127,13 @@ struct TrendsView: View {
                     ChartCard(
                         title: "Pumped", subtitle: "\(volumeUnit) \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
                         animal: Theme.pumpAnimal,
+                        colors: [Theme.pump],
                         points: points([("Pumped", { $0.pumpedML * volumeScale })])
                     )
                     ChartCard(
                         title: "Diapers", subtitle: perLabel, unit: bucketUnit, valueFormat: "%.1f",
                         animal: Theme.diaperAnimal,
+                        colors: [Theme.diaper, Theme.bark],
                         points: points([
                             ("Wet", { Double($0.wetCount) }),
                             ("Dirty", { Double($0.dirtyCount) }),
@@ -137,6 +142,7 @@ struct TrendsView: View {
                     ChartCard(
                         title: "Tummy time", subtitle: "minutes \(perLabel)", unit: bucketUnit, valueFormat: "%.0f",
                         animal: Theme.tummyAnimal,
+                        colors: [Theme.tummy],
                         points: points([("Tummy time", { Double($0.tummySeconds) / 60 })])
                     )
                     GrowthChart(entries: growth, baby: baby, metric: useMetric)
@@ -187,6 +193,8 @@ struct ChartCard: View {
     let unit: Calendar.Component
     let valueFormat: String
     var animal: String = "🌿"
+    /// One color per series, in order.
+    var colors: [Color] = [ChartPalette.first, ChartPalette.second]
     let points: [TrendPoint]
 
     @State private var selectedDate: Date?
@@ -227,7 +235,7 @@ struct ChartCard: View {
                     .cornerRadius(3)
                     .opacity(selectedDate == nil || Calendar.current.isDate(point.date, equalTo: selectedDate!, toGranularity: unit) ? 1 : 0.4)
                 }
-                .chartForegroundStyleScale(domain: seriesNames, range: [ChartPalette.first, ChartPalette.second].prefix(max(1, seriesNames.count)).map { $0 })
+                .chartForegroundStyleScale(domain: seriesNames, range: Array(colors.prefix(max(1, seriesNames.count))))
                 .chartLegend(seriesNames.count > 1 ? .visible : .hidden)
                 .chartXSelection(value: $selectedDate)
                 .chartXAxis {
@@ -413,10 +421,10 @@ struct GrowthChart: View {
                     ForEach(points) { point in
                         LineMark(x: .value("Date", point.entry.timestamp), y: .value(measure.label, shown(point.value)), series: .value("Curve", "Baby"))
                             .lineStyle(StrokeStyle(lineWidth: 2.5))
-                            .foregroundStyle(ChartPalette.first)
+                            .foregroundStyle(Theme.weight)
                         PointMark(x: .value("Date", point.entry.timestamp), y: .value(measure.label, shown(point.value)))
                             .symbolSize(70)
-                            .foregroundStyle(ChartPalette.first)
+                            .foregroundStyle(Theme.weight)
                     }
                     if let selected {
                         RuleMark(x: .value("Selected", selected.entry.timestamp))

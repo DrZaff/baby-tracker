@@ -371,7 +371,7 @@ struct AppointmentFormView: View {
                     }
                     .padding(.vertical, 4)
                 }
-                TextField("Name (optional), like \"2-month checkup\"", text: $title)
+                TextField("Name (optional)", text: $title)
             } header: {
                 Text("What kind")
             }
@@ -386,8 +386,8 @@ struct AppointmentFormView: View {
             }
 
             Section("Details") {
-                TextField("Where, like \"Dr. Lee, Sunnyvale Pediatrics\"", text: $location)
-                TextField("Notes, like questions to ask", text: $notes, axis: .vertical)
+                TextField("Where", text: $location)
+                TextField("Notes or questions to ask", text: $notes, axis: .vertical)
             }
 
             Section {
@@ -502,15 +502,23 @@ struct TodayAppointmentsCard: View {
                     Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 }
                 ForEach(appointments) { appointment in
-                    HStack(spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(appointment.kind.emoji)
-                        Text(appointment.start.formatted(date: .omitted, time: .shortened))
-                            .font(.subheadline.weight(.bold).monospacedDigit())
-                        Text(appointment.displayTitle).font(.subheadline).lineLimit(1)
-                        if let location = appointment.location?.trimmedOrNil {
-                            Text("· \(location)").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Text(appointment.start.formatted(date: .omitted, time: .shortened))
+                                    .font(.subheadline.weight(.bold).monospacedDigit())
+                                    .fixedSize()
+                                Text(appointment.displayTitle)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                            }
+                            if let location = appointment.location?.trimmedOrNil {
+                                Text(location).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            }
                         }
                     }
+                    .foregroundStyle(.primary)
                 }
             }
             .padding(14)

@@ -242,6 +242,7 @@ struct TodayHeader: View {
                 }
                 .accessibilityLabel("Next day")
                 .disabled(calendar.isDateInToday(day))
+                .opacity(calendar.isDateInToday(day) ? 0.3 : 1)
             }
             .buttonStyle(.borderless)
             .foregroundStyle(Theme.canopy)
@@ -321,8 +322,8 @@ struct DailyReportGrid: View {
                 )
             }
             ReportTile(
-                title: "Tummy time", value: Units.duration(summary.tummySeconds), animal: Theme.tummyAnimal, tint: Theme.tummy,
-                lines: [summary.tummyCount == 0 ? "None yet today" : "\(summary.tummyCount) session\(summary.tummyCount == 1 ? "" : "s")"]
+                title: "Tummy time", value: summary.tummySeconds == 0 ? "0 min" : Units.duration(summary.tummySeconds), animal: Theme.tummyAnimal, tint: Theme.tummy,
+                lines: [summary.tummyCount == 0 ? (Calendar.current.isDateInToday(day) ? "None yet today" : "None") : "\(summary.tummyCount) session\(summary.tummyCount == 1 ? "" : "s")"]
             )
             if summary.sleepCount > 0 {
                 ReportTile(

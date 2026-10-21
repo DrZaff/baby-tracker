@@ -36,10 +36,15 @@ struct MilestoneFormView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
                         ForEach(Self.suggestions, id: \.self) { suggestion in
-                            Button(suggestion) { title = suggestion }
-                                .buttonStyle(.bordered)
-                                .buttonBorderShape(.capsule)
-                                .tint(Theme.milestone)
+                            Button { title = suggestion } label: {
+                                Text(suggestion)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.bark)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Theme.milestone.opacity(0.25), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.vertical, 4)

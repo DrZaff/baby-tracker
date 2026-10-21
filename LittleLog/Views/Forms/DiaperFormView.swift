@@ -53,7 +53,7 @@ struct DiaperFormView: View {
                     ForEach(Contents.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .listRowSeparator(.hidden)
+                .padding(.vertical, 4)
             }
 
             if contents != .pee {

@@ -19,6 +19,10 @@ enum Theme {
     /// Page background: warm sand by day, deep jungle by night.
     static let sandTop = dynamic(light: 0xFFF7E6, dark: 0x0F1F17)
     static let sandBottom = dynamic(light: 0xEAF6DF, dark: 0x132A1E)
+    /// The light line down the middle of background leaves; faint at night.
+    static let leafVein = Color(UIColor { $0.userInterfaceStyle == .dark
+        ? UIColor(white: 1, alpha: 0.08)
+        : UIColor(white: 1, alpha: 0.35) })
     /// Card surface on top of the background.
     static let card = Color(UIColor { $0.userInterfaceStyle == .dark
         ? UIColor(red: 0.12, green: 0.22, blue: 0.16, alpha: 0.92)
@@ -139,7 +143,7 @@ struct Leaf: View {
     var body: some View {
         ZStack {
             LeafShape().fill(LinearGradient(colors: [color, color.opacity(0.75)], startPoint: .top, endPoint: .bottom))
-            LeafVein().stroke(.white.opacity(0.35), style: StrokeStyle(lineWidth: max(1, width * 0.03), lineCap: .round))
+            LeafVein().stroke(Theme.leafVein, style: StrokeStyle(lineWidth: max(1, width * 0.03), lineCap: .round))
         }
         .frame(width: width, height: width * 1.6)
         .rotationEffect(.degrees(angle), anchor: .bottom)
