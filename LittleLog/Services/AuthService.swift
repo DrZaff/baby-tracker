@@ -3,6 +3,7 @@ import FirebaseCore
 import FirebaseAuth
 import FirebaseFirestore
 import GoogleSignIn
+import AuthenticationServices
 
 @Observable
 final class AuthService {
@@ -11,6 +12,7 @@ final class AuthService {
     var errorMessage: String?
 
     @ObservationIgnored private var handle: AuthStateDidChangeListenerHandle?
+    @ObservationIgnored private var appleNonce: String?
 
     var email: String? { user?.email?.lowercased() }
     var uid: String { user?.uid ?? "" }
@@ -54,6 +56,49 @@ final class AuthService {
             // The person closed the Google sheet.
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Sets up the request made by the Sign in with Apple button.
+    func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
+        let nonce = AppleSignIn.randomNonce()
+        appleNonce = nonce
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = AppleSignIn.sha256(nonce)
+    }
+
+    @MainActor
+    func completeAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
+        errorMessage = nil
+        switch result {
+        case .failure(let error):
+            if (error as? ASAuthorizationError)?.code == .canceled { return }
+            errorMessage = error.localizedDescription
+        case .success(let authorization):
+            guard let apple = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = apple.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8),
+                  let nonce = appleNonce
+            else {
+                errorMessage = "Apple didn't return a sign-in token. Please try again."
+                return
+            }
+            let credential = OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: nonce, fullName: apple.fullName)
+            do {
+                let result = try await Auth.auth().signIn(with: credential)
+                // Apple only shares the name the first time, so keep it.
+                if (result.user.displayName ?? "").isEmpty, let name = apple.fullName {
+                    let formatted = PersonNameComponentsFormatter().string(from: name)
+                    if !formatted.isEmpty {
+                        let change = result.user.createProfileChangeRequest()
+                        change.displayName = formatted
+                        try? await change.commitChanges()
+                        Self.saveProfile(result.user)
+                    }
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 

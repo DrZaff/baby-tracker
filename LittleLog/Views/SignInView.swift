@@ -1,7 +1,9 @@
 import SwiftUI
+import AuthenticationServices
 
 struct SignInView: View {
     @Environment(AuthService.self) private var auth
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isSigningIn = false
 
     var body: some View {
@@ -31,6 +33,20 @@ struct SignInView: View {
                     .accessibilityHidden(true)
             }
             Spacer()
+            SignInWithAppleButton(.continue) { request in
+                auth.prepareAppleRequest(request)
+            } onCompletion: { result in
+                isSigningIn = true
+                Task {
+                    await auth.completeAppleSignIn(result)
+                    isSigningIn = false
+                }
+            }
+            .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+            .frame(height: 50)
+            .clipShape(Capsule())
+            .disabled(isSigningIn)
+
             Button {
                 isSigningIn = true
                 Task {
@@ -42,14 +58,17 @@ struct SignInView: View {
                     if isSigningIn { ProgressView().tint(.white) }
                     Text("Continue with Google").fontWeight(.semibold)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .frame(maxWidth: .infinity, minHeight: 50)
             }
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.capsule)
             .tint(Theme.canopy)
             .shadow(color: Theme.canopy.opacity(0.3), radius: 10, y: 5)
             .disabled(isSigningIn)
+
+            Link("Privacy policy", destination: AppLinks.privacyPolicy)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             if let message = auth.errorMessage {
                 Text(message)

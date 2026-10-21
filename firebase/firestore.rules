@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Access model: a baby's document lists the Google emails of its caregivers
+// Access model: a baby's document lists the sign-in emails (Google or Apple) of its caregivers
 // (memberEmails). Anyone signed in with one of those emails can read and write
 // everything for that baby.
 service cloud.firestore {
@@ -29,15 +29,28 @@ service cloud.firestore {
         && request.resource.data.ownerEmail == myEmail()
         && request.resource.data.memberEmails == [myEmail()];
 
+      function isOwner(data) {
+        return signedIn() && (data.ownerUid == request.auth.uid || data.ownerEmail == myEmail());
+      }
+
       // Any caregiver can edit the profile and invite or remove others,
-      // but the owner can't be changed or removed.
+      // but the owner can't be changed or removed...
       allow update: if isMember(resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.ownerEmail == resource.data.ownerEmail
         && resource.data.ownerEmail in request.resource.data.memberEmails
         && request.resource.data.memberEmails.size() <= 20;
 
-      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      // ...except by the owner when they delete their account: they hand the baby
+      // to another caregiver and leave.
+      allow update: if isOwner(resource.data)
+        && request.resource.data.ownerEmail in resource.data.memberEmails
+        && request.resource.data.ownerEmail in request.resource.data.memberEmails
+        && !(myEmail() in request.resource.data.memberEmails)
+        && request.resource.data.ownerUid == ""
+        && request.resource.data.memberEmails.size() <= 20;
+
+      allow delete: if isOwner(resource.data);
 
       match /{document=**} {
         allow read, write: if isMember(get(/databases/$(database)/documents/babies/$(babyId)).data);

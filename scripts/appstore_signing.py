@@ -100,6 +100,18 @@ def ensure_bundle_id(identifier, name, push):
             }
         })
         print("Turned on push notifications for the bundle ID")
+    if not any(c["attributes"]["capabilityType"] == "APPLE_ID_AUTH" for c in capabilities["data"]):
+        call("POST", "/bundleIdCapabilities", {
+            "data": {
+                "type": "bundleIdCapabilities",
+                "attributes": {
+                    "capabilityType": "APPLE_ID_AUTH",
+                    "settings": [{"key": "APPLE_ID_AUTH_APP_CONSENT", "options": [{"key": "PRIMARY_APP_CONSENT"}]}],
+                },
+                "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bundle_id}}},
+            }
+        })
+        print("Turned on Sign in with Apple for the bundle ID")
     return bundle_id
 
 

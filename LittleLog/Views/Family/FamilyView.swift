@@ -12,8 +12,11 @@ struct FamilyView: View {
     @State private var inviting = false
     @State private var inviteEmail = ""
     @State private var confirmingLeave = false
+    @State private var confirmingDelete = false
+    @State private var isDeleting = false
+    @State private var deleteError: String?
 
-    private var isOwner: Bool { baby.ownerUid == auth.uid }
+    private var isOwner: Bool { baby.ownerUid == auth.uid || baby.ownerEmail == auth.email }
 
     var body: some View {
         NavigationStack {
@@ -74,7 +77,7 @@ struct FamilyView: View {
                 } header: {
                     JungleHeader(title: "Caregivers", icon: "🐾")
                 } footer: {
-                    Text("Anyone listed here can sign in with that Google account to see and log everything for \(baby.name), and gets a notification when something new is logged.")
+                    Text("Anyone listed here can sign in with that email, using Google or Apple, to see and log everything for \(baby.name), and gets a notification when something new is logged.")
                 }
 
                 Section {
@@ -141,6 +144,30 @@ struct FamilyView: View {
                     Button("Sign out", role: .destructive) {
                         Task { await auth.signOut() }
                     }
+                } footer: {
+                    if auth.signedInWithApple {
+                        Text("To share a baby with you, a caregiver invites the email above.")
+                    }
+                }
+
+                Section {
+                    Link(destination: AppLinks.privacyPolicy) {
+                        Label("Privacy policy", systemImage: "hand.raised")
+                    }
+                    Link(destination: AppLinks.support) {
+                        Label("Help and contact", systemImage: "questionmark.circle")
+                    }
+                    Button(role: .destructive) {
+                        confirmingDelete = true
+                    } label: {
+                        HStack {
+                            Label("Delete my account", systemImage: "trash")
+                            if isDeleting { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(isDeleting)
+                } footer: {
+                    Text("Deleting your account removes your sign-in and takes you off every baby's caregiver list. Babies only you can see are deleted with everything logged for them. Babies shared with others stay for them.")
                 }
             }
             .jungleBackground()
@@ -152,14 +179,34 @@ struct FamilyView: View {
                 NavigationStack { BabyFormView(mode: .create) }
             }
             .alert("Invite a caregiver", isPresented: $inviting) {
-                TextField("their.gmail@gmail.com", text: $inviteEmail)
+                TextField("their.email@gmail.com", text: $inviteEmail)
                     .keyboardType(.emailAddress)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 Button("Invite") { store.addCaregiver(email: inviteEmail, to: baby) }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Enter the Google account email they'll sign in with. Then send them the app.")
+                Text("Enter the email they'll sign in with: their Google email, or for Apple sign-in, the email shown in their Family tab. Then send them the app.")
+            }
+            .confirmationDialog("Delete your Little Log account?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete account", role: .destructive) {
+                    isDeleting = true
+                    Task {
+                        do {
+                            try await auth.deleteAccount(babies: store.babies)
+                        } catch {
+                            deleteError = error.localizedDescription
+                        }
+                        isDeleting = false
+                    }
+                }
+            } message: {
+                Text("This can't be undone. You'll be asked to confirm with Google or Apple first.")
+            }
+            .alert("Couldn't delete your account", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteError ?? "")
             }
             .confirmationDialog("Stop seeing \(baby.name)'s log?", isPresented: $confirmingLeave, titleVisibility: .visible) {
                 Button("Leave", role: .destructive) {

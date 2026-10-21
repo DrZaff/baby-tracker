@@ -59,6 +59,7 @@ targets:
       path: LittleLog/LittleLog.entitlements
       properties:
         aps-environment: $(APS_ENVIRONMENT)
+        com.apple.developer.applesignin: [Default]
         # The app's own group comes first so sign-in stays in the default keychain group.
         keychain-access-groups:
           - $(AppIdentifierPrefix)$(APP_BUNDLE_ID)
