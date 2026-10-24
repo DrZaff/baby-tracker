@@ -4,13 +4,14 @@ import EventKitUI
 
 /// Which calendar an appointment is added to on this phone.
 enum CalendarChoice: String, CaseIterable, Identifiable {
-    case none, apple, google
+    case none, apple, google, outlook
     var id: String { rawValue }
     var label: String {
         switch self {
         case .none: return "None"
         case .apple: return "Apple"
         case .google: return "Google"
+        case .outlook: return "Outlook"
         }
     }
 }

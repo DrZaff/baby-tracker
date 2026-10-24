@@ -98,6 +98,11 @@ struct AppointmentsView: View {
                                     Label("Add to Google Calendar", systemImage: "calendar.badge.plus")
                                 }
                             }
+                            if let url = appointment.outlookCalendarURL(babyName: baby.name) {
+                                Link(destination: url) {
+                                    Label("Add to Outlook", systemImage: "calendar.badge.plus")
+                                }
+                            }
                         }
                     }
                 } header: {
@@ -111,7 +116,7 @@ struct AppointmentsView: View {
                             MascotBadge(animal: "📆", tint: Theme.river)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Subscribe in my calendar").font(.body.weight(.bold)).foregroundStyle(.primary)
-                                Text("Every appointment shows up in your Apple or Google Calendar and stays up to date.")
+                                Text("Every appointment shows up in your Apple, Google or Outlook calendar and stays up to date.")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
@@ -120,7 +125,7 @@ struct AppointmentsView: View {
                     }
                     .buttonStyle(.plain)
                 } footer: {
-                    Text("Each caregiver subscribes once on their own phone. Apple Calendar picks up changes within about an hour; Google Calendar can take up to a day.")
+                    Text("Each caregiver subscribes once on their own phone. Apple Calendar picks up changes within about an hour; Google and Outlook can take up to a day.")
                 }
                 .listRowBackground(Theme.card)
             }
@@ -152,6 +157,7 @@ struct AppointmentsView: View {
             .confirmationDialog("Subscribe to \(baby.name)'s appointments", isPresented: $choosingSubscription, titleVisibility: .visible) {
                 Button("Apple Calendar") { subscribe(AppLinks.appleCalendarFeed) }
                 Button("Google Calendar") { subscribe(AppLinks.googleCalendarFeed) }
+                Button("Outlook") { subscribe(AppLinks.outlookCalendarFeed) }
             } message: {
                 Text("Pick the calendar app you use. You only need to do this once.")
             }
@@ -440,6 +446,7 @@ struct AppointmentFormView: View {
                 case .none: Text("It's saved in Little Log for everyone either way. To have every appointment show up in your calendar automatically, use Subscribe on the Appointments screen.")
                 case .apple: Text("After you tap Save, the iPhone's calendar opens so you can pick which calendar to add it to.")
                 case .google: Text("After you tap Save, Google Calendar opens with the appointment filled in.")
+                case .outlook: Text("After you tap Save, Outlook opens with the appointment filled in. Sign in with your Outlook.com account if asked.")
                 }
             }
 
@@ -497,9 +504,11 @@ struct AppointmentFormView: View {
         }
     }
 
-    /// Opens Google Calendar when it was picked, then closes the form.
+    /// Opens Google Calendar or Outlook when it was picked, then closes the form.
     private func finish(_ appointment: Appointment) {
         if calendarChoice == .google, let url = appointment.googleCalendarURL(babyName: baby.name) {
+            openURL(url)
+        } else if calendarChoice == .outlook, let url = appointment.outlookCalendarURL(babyName: baby.name) {
             openURL(url)
         }
         dismiss()

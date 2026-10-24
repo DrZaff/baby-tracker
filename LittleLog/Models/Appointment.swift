@@ -79,6 +79,25 @@ struct Appointment: Identifiable, Codable, Equatable {
         }
         return components?.url
     }
+
+    /// Opens Outlook on the web (Outlook.com accounts) with this appointment filled in, ready to save.
+    func outlookCalendarURL(babyName: String) -> URL? {
+        let format = ISO8601DateFormatter()
+        var body = "\(babyName): \(kind.label)"
+        if let notes = notes?.trimmedOrNil { body += "\n\n\(notes)" }
+        body += "\n\nAdded from Little Log"
+        var components = URLComponents(string: "https://outlook.live.com/calendar/0/deeplink/compose")
+        components?.queryItems = [
+            URLQueryItem(name: "path", value: "/calendar/action/compose"),
+            URLQueryItem(name: "rru", value: "addevent"),
+            URLQueryItem(name: "subject", value: "\(babyName): \(displayTitle)"),
+            URLQueryItem(name: "startdt", value: format.string(from: start)),
+            URLQueryItem(name: "enddt", value: format.string(from: end)),
+            URLQueryItem(name: "body", value: body),
+            URLQueryItem(name: "location", value: location?.trimmedOrNil ?? ""),
+        ]
+        return components?.url
+    }
 }
 
 enum AppointmentRepository {
