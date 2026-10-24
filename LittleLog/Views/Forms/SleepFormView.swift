@@ -21,7 +21,8 @@ struct SleepFormView: View {
     init(babyID: String, existing: LogEntry?, defaultDate: Date) {
         self.babyID = babyID
         self.existing = existing
-        _start = State(initialValue: existing?.timestamp ?? defaultDate)
+        // A new sleep typed in by hand starts as the hour just before; Start sleep resets it to now.
+        _start = State(initialValue: existing?.timestamp ?? defaultDate.addingTimeInterval(-3600))
         _stillAsleep = State(initialValue: existing.map { $0.sleepEnd == nil } ?? false)
         _end = State(initialValue: existing?.sleepEnd ?? max(Date(), defaultDate))
         _how = State(initialValue: existing?.sleepHow)
