@@ -157,14 +157,14 @@ private struct SleepTimerCard: View {
     }
 }
 
-/// A row of tappable capsules; tap again to clear.
+/// Equal-width capsules in two columns that fill the row; tap again to clear.
 struct ChoiceChips: View {
     let options: [String]
     @Binding var selection: String?
     let tint: Color
 
     var body: some View {
-        FlowLayout(spacing: 8) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
             ForEach(options, id: \.self) { option in
                 let selected = selection == option
                 Button {
@@ -172,61 +172,17 @@ struct ChoiceChips: View {
                 } label: {
                     Text(option)
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
                         .foregroundStyle(selected ? .white : tint)
                         .background(selected ? tint : tint.opacity(0.14), in: Capsule())
+                        .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 4)
-    }
-}
-
-/// Lays children out left to right, wrapping onto new lines.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(0, rows.count - 1))
-        let width = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width ?? width, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        var y = bounds.minY
-        for row in arrange(width: bounds.width, subviews: subviews) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = [Row()]
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            if !rows[rows.count - 1].indices.isEmpty && rows[rows.count - 1].width + spacing + size.width > width {
-                rows.append(Row())
-            }
-            var row = rows[rows.count - 1]
-            row.width += (row.indices.isEmpty ? 0 : spacing) + size.width
-            row.height = max(row.height, size.height)
-            row.indices.append(index)
-            rows[rows.count - 1] = row
-        }
-        return rows.filter { !$0.indices.isEmpty }
+        .padding(.vertical, 6)
     }
 }
