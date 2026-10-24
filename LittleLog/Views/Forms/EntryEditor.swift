@@ -1,12 +1,14 @@
 import SwiftUI
 
 enum EntryTemplate: String, CaseIterable, Identifiable {
-    case feed, tummy, diaper, weight, milestone, appointment
+    case feed, sleep, diaper, tummy, weight, milestone, vaccines, appointment
     var id: String { rawValue }
 
     var label: String {
         switch self {
         case .feed: return "Feed"
+        case .sleep: return "Sleep"
+        case .vaccines: return "Vaccines"
         case .tummy: return "Tummy time"
         case .diaper: return "Diaper"
         case .weight: return "Growth"
@@ -18,6 +20,8 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
     var animal: String {
         switch self {
         case .feed: return Theme.feedAnimal
+        case .sleep: return Theme.sleepAnimal
+        case .vaccines: return Theme.vaccineAnimal
         case .tummy: return Theme.tummyAnimal
         case .diaper: return Theme.diaperAnimal
         case .weight: return Theme.weightAnimal
@@ -29,6 +33,8 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .feed: return Theme.feed
+        case .sleep: return Theme.sleep
+        case .vaccines: return Theme.vaccine
         case .tummy: return Theme.tummy
         case .diaper: return Theme.diaper
         case .weight: return Theme.weight
@@ -62,11 +68,12 @@ struct EntryEditor: View {
             case .new(let template):
                 switch template {
                 case .feed: FeedFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
+                case .sleep: SleepFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .tummy: TummyTimeFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .diaper: DiaperFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .weight: WeightFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
                 case .milestone: MilestoneFormView(babyID: babyID, existing: nil, defaultDate: defaultDate)
-                case .appointment: EmptyView() // Opens the appointments screen instead; see TodayView.
+                case .appointment, .vaccines: EmptyView() // These open their own screens instead; see TodayView.
                 }
             case .edit(let entry):
                 switch entry.kind {

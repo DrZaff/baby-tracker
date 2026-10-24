@@ -145,6 +145,15 @@ struct TrendsView: View {
                         colors: [Theme.tummy],
                         points: points([("Tummy time", { Double($0.tummySeconds) / 60 })])
                     )
+                    ChartCard(
+                        title: "Sleep", subtitle: "hours \(perLabel)", unit: bucketUnit, valueFormat: "%.1f",
+                        animal: Theme.sleepAnimal,
+                        colors: [Theme.orchid, Theme.sleep],
+                        points: points([
+                            ("Naps", { Double($0.napSeconds) / 3600 }),
+                            ("Night", { Double($0.nightSeconds) / 3600 }),
+                        ])
+                    )
                     GrowthChart(entries: growth, baby: baby, metric: useMetric)
                         .id("growth")
                 }

@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var justLogged: String?
     @State private var todaysAppointments = AppointmentsListener()
     @State private var showingAppointments = false
+    @State private var showingVaccines = false
     @State private var day = Calendar.current.startOfDay(for: Date())
     @State private var dayEntries = EntriesListener()
     @State private var recent = EntriesListener()
@@ -47,6 +48,11 @@ struct TodayView: View {
                 if isToday {
                     Section {
                         SinceLastView(entries: recent.entries)
+                            .listRowSeparator(.hidden)
+                        if let woke = SleepGuide.lastWake(in: recent.entries), !recent.entries.contains(where: { $0.isSleeping }) {
+                            AwakeCard(wokeAt: woke, birthDate: baby.birthDate)
+                                .listRowSeparator(.hidden)
+                        }
                     }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -54,7 +60,11 @@ struct TodayView: View {
 
                 Section {
                     QuickAddGrid { template in
-                        if template == .appointment { showingAppointments = true } else { sheet = .new(template) }
+                        switch template {
+                        case .appointment: showingAppointments = true
+                        case .vaccines: showingVaccines = true
+                        default: sheet = .new(template)
+                        }
                     }
                         .padding(.vertical, 6)
                     if isToday, let bottle = recent.entries.first(where: { $0.hasBottle }) {
@@ -125,6 +135,9 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showingAppointments) {
                 AppointmentsView(baby: baby)
+            }
+            .sheet(isPresented: $showingVaccines) {
+                VaccinesView(baby: baby)
             }
             .task(id: "\(baby.babyID)|\(calendar.startOfDay(for: Date()).timeIntervalSince1970)") {
                 let today = calendar.startOfDay(for: Date())
@@ -328,7 +341,10 @@ struct DailyReportGrid: View {
             if summary.sleepCount > 0 {
                 ReportTile(
                     title: "Sleep", value: Units.duration(summary.sleepSeconds), animal: Theme.sleepAnimal, tint: Theme.sleep,
-                    lines: ["\(summary.sleepCount) sleep\(summary.sleepCount == 1 ? "" : "s")"]
+                    lines: [
+                        "\(summary.napCount) nap\(summary.napCount == 1 ? "" : "s") · \(Units.duration(summary.napSeconds))",
+                        summary.nightSeconds > 0 ? "Night \(Units.duration(summary.nightSeconds))" : nil,
+                    ].compactMap { $0 }
                 )
             }
             if summary.pumpCount > 0 {
@@ -441,18 +457,20 @@ struct QuickAddGrid: View {
     @State private var tapped = 0
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3), spacing: 14) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 4), spacing: 14) {
             ForEach(EntryTemplate.allCases) { template in
                 Button {
                     tapped += 1
                     onSelect(template)
                 } label: {
                     VStack(spacing: 6) {
-                        MascotBadge(animal: template.animal, tint: template.tint, size: 56)
+                        MascotBadge(animal: template.animal, tint: template.tint, size: 52)
                             .shadow(color: template.tint.opacity(0.3), radius: 6, y: 3)
                         Text(template.label)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -572,5 +590,49 @@ struct RepeatBottleButton: View {
     private var description: String {
         let amount = entry.bottleML.map { Units.volume($0, metric: entry.metric ?? useMetric) } ?? ""
         return "\(amount) \((entry.bottleContent ?? .formula).label.lowercased()) · now"
+    }
+}
+
+/// How long the baby has been awake and when the next sleep is likely to go well,
+/// from typical awake times for their age (like a "sweet spot" for naps).
+struct AwakeCard: View {
+    let wokeAt: Date
+    let birthDate: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            let window = SleepGuide.wakeWindow(birthDate: birthDate, on: context.date)
+            let from = wokeAt.addingTimeInterval(window.lowerBound)
+            let to = wokeAt.addingTimeInterval(window.upperBound)
+            let awake = Int(context.date.timeIntervalSince(wokeAt))
+            HStack(spacing: 12) {
+                Text(context.date >= from ? "😴" : Theme.sleepAnimal).font(.title)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Awake for \(Units.duration(max(0, awake)))")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.sleep)
+                    Text(nextSleepText(now: context.date, from: from, to: to))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(LinearGradient(colors: [Theme.sleep.opacity(0.18), Theme.orchid.opacity(0.07)], startPoint: .leading, endPoint: .trailing))
+            )
+            .background(Theme.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.top, 8)
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func nextSleepText(now: Date, from: Date, to: Date) -> String {
+        let time: (Date) -> String = { $0.formatted(date: .omitted, time: .shortened) }
+        if now > to { return "Past the usual awake time for this age. Watch for sleepy cues." }
+        if now >= from { return "Good time for sleep now, until about \(time(to))" }
+        return "Next sleep likely \(time(from)) to \(time(to))"
     }
 }

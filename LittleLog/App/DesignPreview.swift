@@ -92,6 +92,19 @@ enum DemoData {
                     e.dirty = index % 3 == 1
                 })
             }
+            // Naps, plus the night sleep that started the evening before.
+            for (start, minutes) in [(8 * 60 + 40, 70), (12 * 60 + 15, 95), (16 * 60 + 50, 40)] {
+                let begin = at(day, start / 60, start % 60)
+                list.append(entry(.sleep, begin, by: who) { e in
+                    e.sleepEnd = begin.addingTimeInterval(TimeInterval(minutes * 60))
+                    e.sleepPlace = start < 12 * 60 ? "Crib" : "Carrier"
+                })
+            }
+            list.append(entry(.sleep, at(day + 1, 19, 30), by: who) { e in
+                e.sleepEnd = at(day, 6, 10)
+                e.sleepHow = "Nursing"
+                e.sleepPlace = "Bassinet"
+            })
             for (index, hour) in [9, 15].enumerated() {
                 list.append(entry(.tummy, at(day, hour, 20), by: who) { e in
                     e.tummySeconds = 240 + (day * 31 + index * 47) % 420
@@ -117,12 +130,22 @@ enum DemoData {
         }
         list.append(entry(.milestone, at(0, 8, 15), by: "Danielle") { e in e.title = "First real smile" })
         list.append(entry(.milestone, at(12, 17), by: "Brandon") { e in e.title = "Held head up" })
-        return list.filter { $0.timestamp <= now }.sorted { $0.timestamp > $1.timestamp }
+        return list.filter { $0.timestamp <= now && ($0.sleepEnd ?? now) <= now }.sorted { $0.timestamp > $1.timestamp }
     }()
 
     static func entries(from start: Date, to end: Date?) -> [LogEntry] {
         entries.filter { $0.timestamp >= start && (end == nil || $0.timestamp < end!) }
     }
+
+    /// Shots checked off so far: everything through the 2-month visit.
+    static let vaccines: [String: VaccineRecord] = {
+        var given: [String: VaccineRecord] = [:]
+        for (id, days) in [("hepb-1", 0), ("hepb-2", 33), ("dtap-1", 61), ("hib-1", 61), ("ipv-1", 61), ("pcv-1", 61), ("rv-1", 61)] {
+            let date = Calendar.current.date(byAdding: .day, value: days, to: baby.birthDate) ?? Date()
+            given[id] = VaccineRecord(givenOn: date, checkedByUid: "danielle", checkedByName: "Danielle")
+        }
+        return given
+    }()
 
     static let appointments: [Appointment] = {
         let calendar = Calendar.current
@@ -174,6 +197,8 @@ struct DesignPreviewRoot: View {
         switch DesignPreview.screen {
         case "signin": SignInView()
         case "feed": NavigationStack { FeedFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }
+        case "sleep": NavigationStack { SleepFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }
+        case "vaccines": VaccinesView(baby: baby)
         case "tummy": NavigationStack { TummyTimeFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }
         case "diaper": NavigationStack { DiaperFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }
         case "growth": NavigationStack { WeightFormView(babyID: baby.babyID, existing: nil, defaultDate: Date()) }

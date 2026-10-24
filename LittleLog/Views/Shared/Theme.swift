@@ -38,6 +38,7 @@ enum Theme {
     static let weight = river
     static let milestone = sunshine
     static let daycare = leaf
+    static let vaccine = orchid
 
     // Animal friends.
     static let feedAnimal = "🐘"
@@ -50,6 +51,7 @@ enum Theme {
     static let milestoneAnimal = "🦁"
     static let daycareAnimal = "🦜"
     static let pickUpAnimal = "🐯"
+    static let vaccineAnimal = "🦔"
 
     private static func dynamic(light: UInt32, dark: UInt32) -> Color {
         Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light) })

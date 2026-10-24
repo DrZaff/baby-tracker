@@ -146,7 +146,7 @@ extension AuthService {
     private static func deleteEverything(for babyID: String) async throws {
         let baby = Firestore.firestore().collection("babies").document(babyID)
         let storage = Storage.storage()
-        for name in ["entries", "appointments", "photos"] {
+        for name in ["entries", "appointments", "photos", "vaccines"] {
             while true {
                 let page = try await baby.collection(name).limit(to: 300).getDocuments()
                 if page.documents.isEmpty { break }

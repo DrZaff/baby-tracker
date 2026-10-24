@@ -23,6 +23,9 @@ struct DaySummary {
     var tummySeconds = 0
     var sleepCount = 0
     var sleepSeconds = 0
+    var napCount = 0
+    var napSeconds = 0
+    var nightSeconds = 0
     var milestones: [String] = []
 
     var breastSeconds: Int { breastLeftSeconds + breastRightSeconds }
@@ -59,7 +62,14 @@ struct DaySummary {
                 tummySeconds += entry.tummySeconds ?? 0
             case .sleep:
                 sleepCount += 1
-                sleepSeconds += entry.sleepSeconds(now: now)
+                let seconds = entry.sleepSeconds(now: now)
+                sleepSeconds += seconds
+                if entry.isNightSleep {
+                    nightSeconds += seconds
+                } else {
+                    napCount += 1
+                    napSeconds += seconds
+                }
             case .weight:
                 latestWeightGrams = entry.weightGrams ?? latestWeightGrams
                 latestLengthCm = entry.lengthCm ?? latestLengthCm

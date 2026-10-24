@@ -70,8 +70,11 @@ struct LogEntry: Identifiable, Codable, Equatable {
     // Tummy time: timestamp is when it started.
     var tummySeconds: Int?
 
-    // Sleep (no longer logged, kept for older entries): timestamp is when it started. No end means the baby is still asleep.
+    // Sleep: timestamp is when it started. No end means the baby is still asleep.
     var sleepEnd: Date?
+    /// How the baby fell asleep (a SleepHow label), and where.
+    var sleepHow: String?
+    var sleepPlace: String?
 
     // Growth (kind .weight): any of weight, length and head circumference.
     var weightGrams: Double?
@@ -107,6 +110,13 @@ extension LogEntry {
     var isPumpOnly: Bool { kind == .feed && hasPump && !hasBreast && !hasBottle }
     var isSleeping: Bool { kind == .sleep && sleepEnd == nil }
 
+    /// Sleeps that start in the evening or overnight (7 PM to 5 AM) count as night sleep; the rest are naps.
+    var isNightSleep: Bool {
+        guard kind == .sleep else { return false }
+        let hour = Calendar.current.component(.hour, from: timestamp)
+        return hour >= 19 || hour < 5
+    }
+
     func sleepSeconds(now: Date = Date()) -> Int {
         guard kind == .sleep else { return 0 }
         return max(0, Int((sleepEnd ?? now).timeIntervalSince(timestamp)))
@@ -130,7 +140,7 @@ extension LogEntry {
             case (false, true): return "Poop"
             default: return "Pee"
             }
-        case .sleep: return isSleeping ? "Sleeping" : "Sleep"
+        case .sleep: return isSleeping ? "Sleeping" : (isNightSleep ? "Night sleep" : "Nap")
         case .tummy: return "Tummy time"
         case .weight:
             if measurementCount > 1 { return "Growth check" }
@@ -181,6 +191,8 @@ extension LogEntry {
             } else {
                 parts.append("since \(timestamp.formatted(date: .omitted, time: .shortened))")
             }
+            if let place = sleepPlace { parts.append(place.lowercased()) }
+            if let how = sleepHow { parts.append(how.lowercased()) }
         case .tummy:
             if let seconds = tummySeconds, seconds > 0 { parts.append(Units.duration(seconds)) }
         case .weight:
@@ -201,7 +213,7 @@ extension LogEntry {
         switch kind {
         case .feed: noun = isPumpOnly ? "a pump session" : "a feed"
         case .diaper: noun = "a diaper, \(displayTitle.lowercased())"
-        case .sleep: noun = isSleeping ? "the start of a sleep" : "a sleep"
+        case .sleep: noun = isSleeping ? "the start of a sleep" : (isNightSleep ? "a night sleep" : "a nap")
         case .tummy: noun = "tummy time"
         case .weight: noun = measurementCount > 1 ? "a growth check" : "a \(displayTitle.lowercased())"
         case .milestone: noun = "a milestone: \(displayTitle)"
