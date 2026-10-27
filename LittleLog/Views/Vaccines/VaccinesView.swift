@@ -39,15 +39,36 @@ struct VaccinesView: View {
                 }
 
                 if !later.isEmpty {
+                    // Later visits fold away, and open as the same age sections as the ones above.
                     Section {
-                        DisclosureGroup(isExpanded: $showLater.animation()) {
-                            ForEach(later.flatMap(\.doses)) { dose in row(dose) }
+                        Button {
+                            withAnimation { showLater.toggle() }
                         } label: {
-                            Text("Later: \(later.map(\.title).joined(separator: ", "))")
-                                .font(.subheadline.weight(.semibold))
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(showLater ? "Hide later vaccines" : "Show later vaccines")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(later.map(\.title).joined(separator: ", "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .font(.subheadline.weight(.semibold))
+                                    .rotationEffect(.degrees(showLater ? 180 : 0))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
                     .listRowBackground(Theme.card)
+
+                    if showLater {
+                        ForEach(later) { visit in
+                            visitSection(visit)
+                        }
+                    }
                 }
 
                 Section {
