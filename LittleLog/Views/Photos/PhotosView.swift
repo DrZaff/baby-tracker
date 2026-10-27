@@ -69,7 +69,7 @@ struct PhotosView: View {
                 Task { await upload(items) }
             }
             .fullScreenCover(item: $selected) { photo in
-                PhotoDetailView(photo: photo, babyID: baby.babyID)
+                PhotoDetailView(store: store, startID: photo.pageID, babyID: baby.babyID)
             }
             .task(id: baby.babyID) { store.listen(babyID: baby.babyID) }
         }
@@ -121,59 +121,83 @@ struct PhotoThumbnail: View {
     }
 }
 
+extension BabyPhoto {
+    /// Stable id for paging, even before the server assigns a document id.
+    var pageID: String { id ?? url }
+}
+
+/// Full-screen photos: swipe left and right to move between them, newest first like the grid.
 struct PhotoDetailView: View {
-    let photo: BabyPhoto
+    let store: PhotoStore
     let babyID: String
 
     @Environment(\.dismiss) private var dismiss
-    @State private var caption: String
+    @State private var currentID: String
+    @State private var loaded: [String: Image] = [:]
+    @State private var caption = ""
     @State private var editingCaption = false
     @State private var confirmingDelete = false
 
-    init(photo: BabyPhoto, babyID: String) {
-        self.photo = photo
+    init(store: PhotoStore, startID: String, babyID: String) {
+        self.store = store
         self.babyID = babyID
-        _caption = State(initialValue: photo.caption ?? "")
+        _currentID = State(initialValue: startID)
     }
+
+    private var current: BabyPhoto? { store.photos.first { $0.pageID == currentID } }
 
     var body: some View {
         NavigationStack {
-            AsyncImage(url: URL(string: photo.url)) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFit()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                ShareLink(item: image, preview: SharePreview(photo.caption ?? "Baby photo", image: image))
-                            }
+            TabView(selection: $currentID) {
+                ForEach(store.photos, id: \.pageID) { photo in
+                    AsyncImage(url: URL(string: photo.url)) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFit()
+                                .onAppear { loaded[photo.pageID] = image }
+                        } else if phase.error != nil {
+                            Label("Couldn't load photo", systemImage: "exclamationmark.triangle").foregroundStyle(.white)
+                        } else {
+                            ProgressView().tint(.white)
                         }
-                } else if phase.error != nil {
-                    Label("Couldn't load photo", systemImage: "exclamationmark.triangle").foregroundStyle(.white)
-                } else {
-                    ProgressView().tint(.white)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .tag(photo.pageID)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .tabViewStyle(.page(indexDisplayMode: .never))
             .background(Color.black.ignoresSafeArea())
             .safeAreaInset(edge: .bottom) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let text = photo.caption, !text.isEmpty {
-                        Text(text).font(.body)
+                if let photo = current {
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let text = photo.caption, !text.isEmpty {
+                            Text(text).font(.body)
+                        }
+                        Text("\(photo.createdByName) · \(photo.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                            .font(.caption)
+                            .opacity(0.7)
                     }
-                    Text("\(photo.createdByName) · \(photo.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.caption)
-                        .opacity(0.7)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(.black.opacity(0.6))
                 }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.black.opacity(0.6))
             }
+            .navigationTitle(positionText)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
                 }
+                if let photo = current, let image = loaded[photo.pageID] {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ShareLink(item: image, preview: SharePreview(photo.caption ?? "Baby photo", image: image))
+                    }
+                }
                 ToolbarItem(placement: .bottomBar) {
-                    Button { editingCaption = true } label: { Label("Caption", systemImage: "text.bubble") }
+                    Button {
+                        caption = current?.caption ?? ""
+                        editingCaption = true
+                    } label: { Label("Caption", systemImage: "text.bubble") }
                 }
                 ToolbarItem(placement: .bottomBar) {
                     Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
@@ -183,16 +207,33 @@ struct PhotoDetailView: View {
             .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
             .alert("Caption", isPresented: $editingCaption) {
                 TextField("Add a caption", text: $caption)
-                Button("Save") { PhotoStore.updateCaption(caption, photo: photo, babyID: babyID) }
+                Button("Save") {
+                    if let photo = current { PhotoStore.updateCaption(caption, photo: photo, babyID: babyID) }
+                }
                 Button("Cancel", role: .cancel) {}
             }
             .confirmationDialog("Delete this photo for everyone?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                Button("Delete", role: .destructive) {
-                    Task {
-                        await PhotoStore.delete(photo, babyID: babyID)
-                        dismiss()
-                    }
-                }
+                Button("Delete", role: .destructive) { deleteCurrent() }
+            }
+        }
+    }
+
+    /// "3 of 12", so it's clear there are more to swipe through.
+    private var positionText: String {
+        guard store.photos.count > 1, let index = store.photos.firstIndex(where: { $0.pageID == currentID }) else { return "" }
+        return "\(index + 1) of \(store.photos.count)"
+    }
+
+    /// Deletes the photo on screen and moves to the next one (or closes when it was the last).
+    private func deleteCurrent() {
+        guard let photo = current, let index = store.photos.firstIndex(where: { $0.pageID == photo.pageID }) else { return }
+        let others = store.photos.filter { $0.pageID != photo.pageID }
+        Task {
+            await PhotoStore.delete(photo, babyID: babyID)
+            if others.isEmpty {
+                dismiss()
+            } else {
+                currentID = others[min(index, others.count - 1)].pageID
             }
         }
     }
