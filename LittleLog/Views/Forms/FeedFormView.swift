@@ -161,10 +161,10 @@ struct FeedFormView: View {
     /// Shows the running timer on the lock screen and in the Dynamic Island.
     private func updateLiveActivity() {
         let timers: [(SideTimer, String, String, UInt32)] = [
-            (breastLeft, "Breastfeeding · Left", Theme.feedAnimal, 0xE8566C),
-            (breastRight, "Breastfeeding · Right", Theme.feedAnimal, 0xE8566C),
-            (pumpLeft, "Pumping · Left", Theme.pumpAnimal, 0x9B6BD3),
-            (pumpRight, "Pumping · Right", Theme.pumpAnimal, 0x9B6BD3),
+            (breastLeft, "Breastfeeding · Left", Theme.feedAnimal, AppTheme.current.palette.hibiscus.light),
+            (breastRight, "Breastfeeding · Right", Theme.feedAnimal, AppTheme.current.palette.hibiscus.light),
+            (pumpLeft, "Pumping · Left", Theme.pumpAnimal, AppTheme.current.palette.orchid.light),
+            (pumpRight, "Pumping · Right", Theme.pumpAnimal, AppTheme.current.palette.orchid.light),
         ]
         if let (timer, title, animal, color) = timers.first(where: { $0.0.isRunning }) {
             LiveActivities.shared.showFeedTimer(

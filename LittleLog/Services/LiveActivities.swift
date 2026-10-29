@@ -42,7 +42,7 @@ final class LiveActivities {
     func endFeedTimer() { end(kind: "feed") }
 
     func showSleep(since: Date) {
-        show(kind: "sleep", state: .init(title: "Sleeping", animal: "🐨", startedAt: since, color: 0x5B5FC7))
+        show(kind: "sleep", state: .init(title: "Sleeping", animal: Theme.sleepAnimal, startedAt: since, color: AppTheme.current.palette.dusk.light))
     }
 
     func endSleep() { end(kind: "sleep") }

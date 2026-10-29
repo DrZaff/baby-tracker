@@ -48,7 +48,7 @@ struct TummyTimeFormView: View {
     private func updateLiveActivity() {
         if timer.isRunning {
             LiveActivities.shared.showFeedTimer(
-                title: "Tummy time", animal: Theme.tummyAnimal, color: 0x5DB563,
+                title: "Tummy time", animal: Theme.tummyAnimal, color: AppTheme.current.palette.leaf.light,
                 startedAt: Date().addingTimeInterval(-timer.elapsed())
             )
         } else {

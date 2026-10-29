@@ -46,7 +46,7 @@ struct PhotosView: View {
                 if store.hasLoaded && store.photos.isEmpty && uploadProgress == nil {
                     ContentUnavailableView {
                         VStack(spacing: 8) {
-                            Text("🦒📸").font(.system(size: 56))
+                            Text(Theme.decor.photosEmpty).font(.system(size: 56))
                             Text("No photos yet").font(.title2.bold())
                         }
                     } description: {

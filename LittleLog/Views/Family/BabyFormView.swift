@@ -33,7 +33,7 @@ struct BabyFormView: View {
             if isFirstBaby {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("🦁 Welcome, \(auth.displayName)")
+                        Text("\(Theme.decor.welcome) Welcome, \(auth.displayName)")
                             .font(.title2.bold())
                         Text("Add your baby to start logging. If someone already added your baby, ask them to invite \(auth.email ?? "your email") from the Family tab.")
                             .font(.callout)

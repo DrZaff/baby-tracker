@@ -29,7 +29,7 @@ struct FamilyView: View {
                             Text(String(baby.name.prefix(1)).uppercased())
                                 .font(.system(size: 30, weight: .heavy, design: .rounded))
                                 .foregroundStyle(.white)
-                            Text("🌺").font(.system(size: 20)).offset(x: 24, y: -24)
+                            Text(Theme.decor.accent).font(.system(size: 20)).offset(x: 24, y: -24)
                         }
                         .frame(width: 64, height: 64)
                         VStack(alignment: .leading, spacing: 2) {
@@ -75,7 +75,7 @@ struct FamilyView: View {
                         Label("Invite a caregiver", systemImage: "person.badge.plus")
                     }
                 } header: {
-                    JungleHeader(title: "Caregivers", icon: "🐾")
+                    JungleHeader(title: "Caregivers", icon: Theme.decor.caregiversIcon)
                 } footer: {
                     Text("Anyone listed here can sign in with that email, using Google or Apple, to see and log everything for \(baby.name), and gets a notification when something new is logged.")
                 }
@@ -100,7 +100,16 @@ struct FamilyView: View {
                         Label("Add another baby", systemImage: "plus")
                     }
                 } header: {
-                    JungleHeader(title: "Babies", icon: "🐣")
+                    JungleHeader(title: "Babies", icon: Theme.decor.babiesIcon)
+                }
+
+                Section {
+                    ThemePicker()
+                        .listRowInsets(EdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8))
+                } header: {
+                    JungleHeader(title: "Theme", icon: "🎨")
+                } footer: {
+                    Text("Changes the colors, animals and pictures on this phone only. Everything works the same in every theme.")
                 }
 
                 Section {
@@ -129,7 +138,7 @@ struct FamilyView: View {
                         }
                     }
                 } header: {
-                    JungleHeader(title: "Settings", icon: "🌿")
+                    JungleHeader(title: "Settings", icon: Theme.decor.settingsIcon)
                 } footer: {
                     Text("The feed reminder notifies every caregiver when \(baby.name) hasn't had a breast or bottle feed for that long. The vitamin D reminder adds a daily checkbox when logging a feed, plus a Vitamin D tile on the daily report.")
                 }
@@ -215,4 +224,48 @@ struct FamilyView: View {
             }
         }
     }
+}
+
+/// Five little theme cards; tapping one redraws the app in that look.
+struct ThemePicker: View {
+    @AppStorage(AppTheme.storageKey) private var selected = AppTheme.jungle.rawValue
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(AppTheme.allCases) { theme in
+                let isOn = selected == theme.rawValue
+                let palette = theme.palette
+                Button {
+                    withAnimation { selected = theme.rawValue }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(theme.art.feed)
+                            .font(.system(size: 26))
+                            .frame(width: 50, height: 50)
+                            .background(
+                                Circle().fill(LinearGradient(
+                                    colors: [color(palette.lime.light), color(palette.leaf.light)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                ))
+                            )
+                            .overlay(Circle().strokeBorder(isOn ? color(palette.canopy.light) : .clear, lineWidth: 3))
+                        Text(theme.name)
+                            .font(.caption2.weight(isOn ? .heavy : .semibold))
+                            .foregroundStyle(isOn ? Theme.canopy : .secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(isOn ? Theme.canopy.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(BouncyButtonStyle())
+                .accessibilityLabel("\(theme.name) theme")
+                .accessibilityAddTraits(isOn ? .isSelected : [])
+            }
+        }
+        .sensoryFeedback(.selection, trigger: selected)
+    }
+
+    private func color(_ hex: UInt32) -> Color { Color(uiColor: UIColor(hex: hex)) }
 }

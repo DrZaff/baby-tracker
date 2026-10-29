@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#FFF8E1"/>
+      <stop offset="0.45" stop-color="#E4F4C4"/>
+      <stop offset="0.8" stop-color="#9ED48A"/>
+      <stop offset="1" stop-color="#5DB563"/>
+    </radialGradient>
+    <linearGradient id="leafA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6CC774"/><stop offset="1" stop-color="#2E8A4E"/>
+    </linearGradient>
+    <linearGradient id="leafB" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8FD47A"/><stop offset="1" stop-color="#3E9B57"/>
+    </linearGradient>
+    <radialGradient id="skin" cx="38%" cy="30%" r="80%">
+      <stop offset="0" stop-color="#D5DDEA"/>
+      <stop offset="0.6" stop-color="#AEBBD0"/>
+      <stop offset="1" stop-color="#8F9DB6"/>
+    </radialGradient>
+    <radialGradient id="ear" cx="50%" cy="45%" r="60%">
+      <stop offset="0" stop-color="#B9C5D8"/><stop offset="1" stop-color="#8D9BB4"/>
+    </radialGradient>
+    <radialGradient id="earIn" cx="45%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#FFD1DC"/><stop offset="1" stop-color="#F49AB2"/>
+    </radialGradient>
+    <radialGradient id="petal" cx="50%" cy="80%" r="90%">
+      <stop offset="0" stop-color="#FF8FA3"/><stop offset="1" stop-color="#E23D5E"/>
+    </radialGradient>
+    <filter id="soft" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="drop" filterUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#2E6B4A" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- leaves -->
+  <g opacity="0.95">
+    <path d="M-40 1060 C -20 820, 120 700, 300 690 C 300 860, 180 1000, -40 1060 Z" fill="url(#leafA)"/>
+    <path d="M-20 1040 C 80 900, 180 790, 290 700" stroke="#BFE8A6" stroke-width="8" fill="none" opacity="0.6" stroke-linecap="round"/>
+    <path d="M1064 1060 C 1044 820, 904 700, 724 690 C 724 860, 844 1000, 1064 1060 Z" fill="url(#leafB)"/>
+    <path d="M1044 1040 C 944 900, 844 790, 734 700" stroke="#D7F2B8" stroke-width="8" fill="none" opacity="0.6" stroke-linecap="round"/>
+    <path d="M-60 -40 C 40 120, 200 190, 330 170 C 290 40, 150 -40, -60 -40 Z" fill="url(#leafB)" opacity="0.55"/>
+    <path d="M1084 -40 C 984 120, 824 190, 694 170 C 734 40, 874 -40, 1084 -40 Z" fill="url(#leafA)" opacity="0.45"/>
+  </g>
+
+  <!-- shadow under the elephant -->
+  <ellipse cx="512" cy="905" rx="230" ry="38" fill="#2E6B4A" opacity="0.18" filter="url(#soft)"/>
+
+  <g filter="url(#drop)">
+    <!-- ears -->
+    <g transform="rotate(-14 270 520)">
+      <ellipse cx="270" cy="520" rx="185" ry="200" fill="url(#ear)"/>
+      <ellipse cx="282" cy="528" rx="132" ry="148" fill="url(#earIn)"/>
+    </g>
+    <g transform="rotate(14 754 520)">
+      <ellipse cx="754" cy="520" rx="185" ry="200" fill="url(#ear)"/>
+      <ellipse cx="742" cy="528" rx="132" ry="148" fill="url(#earIn)"/>
+    </g>
+    <!-- head -->
+    <circle cx="512" cy="500" r="255" fill="url(#skin)"/>
+  </g>
+  <!-- trunk, curling up at the tip -->
+  <g filter="url(#drop)">
+    <path d="M512 575 C 512 690, 498 790, 560 838 C 615 880, 690 846, 676 784"
+          stroke="#A1AFC6" stroke-width="98" fill="none" stroke-linecap="round"/>
+    <path d="M490 640 C 488 700, 486 760, 520 806" stroke="#C3CDDD" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.35"/>
+    <path d="M470 700 Q 506 716 548 702" stroke="#8796B0" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M474 748 Q 510 766 552 752" stroke="#8796B0" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.55"/>
+  </g>
+
+  <!-- cheeks -->
+  <ellipse cx="372" cy="590" rx="52" ry="30" fill="#FF9DB3" opacity="0.7"/>
+  <ellipse cx="652" cy="590" rx="52" ry="30" fill="#FF9DB3" opacity="0.7"/>
+
+  <!-- eyes -->
+  <g>
+    <ellipse cx="420" cy="505" rx="38" ry="48" fill="#262B38"/>
+    <circle cx="407" cy="487" r="14" fill="#fff"/>
+    <circle cx="433" cy="524" r="7" fill="#fff" opacity="0.85"/>
+    <ellipse cx="604" cy="505" rx="38" ry="48" fill="#262B38"/>
+    <circle cx="591" cy="487" r="14" fill="#fff"/>
+    <circle cx="617" cy="524" r="7" fill="#fff" opacity="0.85"/>
+  </g>
+
+  <!-- shine on the head -->
+  <ellipse cx="420" cy="345" rx="90" ry="44" fill="#fff" opacity="0.28" transform="rotate(-20 420 345)"/>
+
+  <!-- leaves tucked behind the flower -->
+  <path d="M690 300 C 640 230, 570 230, 540 262 C 590 300, 640 312, 690 300 Z" fill="#4DAA5C"/>
+  <path d="M690 300 C 760 330, 790 390, 772 420 C 730 400, 700 350, 690 300 Z" fill="#3E9B57"/>
+  <!-- hibiscus -->
+  <g transform="translate(690 300) rotate(12)">
+    <g fill="url(#petal)">
+      <ellipse cx="0" cy="-58" rx="44" ry="56"/>
+      <ellipse cx="0" cy="-58" rx="44" ry="56" transform="rotate(72)"/>
+      <ellipse cx="0" cy="-58" rx="44" ry="56" transform="rotate(144)"/>
+      <ellipse cx="0" cy="-58" rx="44" ry="56" transform="rotate(216)"/>
+      <ellipse cx="0" cy="-58" rx="44" ry="56" transform="rotate(288)"/>
+    </g>
+    <circle r="26" fill="#FFC93C"/>
+    <circle r="11" cx="-6" cy="-6" fill="#FFE59A"/>
+  </g>
+</svg>

@@ -131,7 +131,7 @@ struct AppointmentsView: View {
             }
             .listSectionSpacing(.compact)
             .jungleBackground()
-            .navigationTitle("🦉 Appointments")
+            .navigationTitle("\(Theme.appointmentAnimal) Appointments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
@@ -524,7 +524,7 @@ struct TodayAppointmentsCard: View {
         Button(action: openAll) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("🦉 Today's appointments").font(.caption.weight(.heavy)).foregroundStyle(Theme.river)
+                    Text("\(Theme.appointmentAnimal) Today's appointments").font(.caption.weight(.heavy)).foregroundStyle(Theme.river)
                     Spacer()
                     Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(.secondary)
                 }

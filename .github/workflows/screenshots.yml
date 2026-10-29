@@ -10,6 +10,10 @@ on:
         description: Only these screens, in light mode (space separated). Leave empty for all.
         required: false
         default: ""
+      themes:
+        description: With "screens", the themes to shoot them in (jungle ocean space dinosaur princess).
+        required: false
+        default: "jungle"
 
 jobs:
   screenshots:
@@ -47,6 +51,7 @@ jobs:
         timeout-minutes: 45
         env:
           ONLY: ${{ inputs.screens }}
+          THEMES: ${{ inputs.themes }}
         run: |
           brew install coreutils > /dev/null
           t() { gtimeout "$@" || echo "  (timed out or failed: $*)"; }
@@ -80,7 +85,7 @@ jobs:
             t 120 xcrun simctl install "$udid" "$APP"
             shoot() {
               echo "  $2 $1"
-              t 30 xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" -designPreview -screen "$1" > /dev/null
+              t 30 xcrun simctl launch --terminate-running-process "$udid" "$BUNDLE" -designPreview -screen "$1" $THEME_ARGS > /dev/null
               sleep 5
               t 30 xcrun simctl io "$udid" screenshot "shots/$name-$2-$1.png" > /dev/null 2>&1
             }
@@ -89,7 +94,13 @@ jobs:
             t 60 xcrun simctl launch "$udid" "$BUNDLE" -designPreview -screen today > /dev/null
             sleep 20
             if [ -n "$ONLY" ]; then
-              for s in $ONLY; do shoot "$s" light; done
+              for theme in ${THEMES:-jungle}; do
+                THEME_ARGS="-appTheme $theme"
+                for s in $ONLY; do shoot "$s" "light-$theme"; done
+                t 30 xcrun simctl ui "$udid" appearance dark
+                for s in $ONLY; do shoot "$s" "dark-$theme"; done
+                t 30 xcrun simctl ui "$udid" appearance light
+              done
               t 60 xcrun simctl shutdown "$udid"
               echo "::endgroup::"
               continue

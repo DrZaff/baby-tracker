@@ -26,7 +26,7 @@ enum EntryTemplate: String, CaseIterable, Identifiable {
         case .diaper: return Theme.diaperAnimal
         case .weight: return Theme.weightAnimal
         case .milestone: return Theme.milestoneAnimal
-        case .appointment: return "🦉"
+        case .appointment: return Theme.appointmentAnimal
         }
     }
 

@@ -71,7 +71,7 @@ struct TodayView: View {
                         RepeatBottleButton(entry: bottle, justLogged: justLogged) { repeatBottle(bottle) }
                     }
                 } header: {
-                    JungleHeader(title: "Log something", icon: "🐾")
+                    JungleHeader(title: "Log something", icon: Theme.decor.logIcon)
                 }
                 .listRowBackground(Theme.card)
 
@@ -79,7 +79,7 @@ struct TodayView: View {
                     DailyReportGrid(summary: DaySummary(entries: dayEntries.entries), metric: useMetric, baby: baby, day: day)
                         .id("report")
                 } header: {
-                    JungleHeader(title: isToday ? "Today's report" : "Daily report", icon: "🌿")
+                    JungleHeader(title: isToday ? "Today's report" : "Daily report", icon: Theme.decor.reportIcon)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
@@ -87,8 +87,8 @@ struct TodayView: View {
                 Section {
                     if dayEntries.hasLoaded && dayEntries.entries.isEmpty {
                         HStack(spacing: 12) {
-                            Text("🦥").font(.largeTitle)
-                            Text(isToday ? "All quiet in the jungle so far today." : "Nothing logged this day.")
+                            Text(Theme.decor.quietAnimal).font(.largeTitle)
+                            Text(isToday ? Theme.decor.quietText : "Nothing logged this day.")
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.vertical, 6)
@@ -111,7 +111,7 @@ struct TodayView: View {
                 } header: {
                     JungleHeader(
                         title: dayEntries.entries.isEmpty ? "Timeline" : "Timeline · \(dayEntries.entries.count)",
-                        icon: "🍃"
+                        icon: Theme.decor.timelineIcon
                     )
                 }
                 .listRowBackground(Theme.card)
@@ -230,8 +230,8 @@ struct TodayHeader: View {
                     Circle()
                         .fill(LinearGradient(colors: [Theme.lime.opacity(0.7), Theme.leaf.opacity(0.5)], startPoint: .topLeading, endPoint: .bottomTrailing))
                         .frame(width: 76, height: 76)
-                    Text("🐵").font(.system(size: 44))
-                    Text("🌺").font(.system(size: 20)).offset(x: 28, y: -28)
+                    Text(Theme.decor.mascot).font(.system(size: 44))
+                    Text(Theme.decor.accent).font(.system(size: 20)).offset(x: 28, y: -28)
                 }
                 .accessibilityHidden(true)
             }
@@ -364,11 +364,11 @@ struct DailyReportGrid: View {
                            lines: percentileLine(.weight, grams / 1000))
             }
             if let cm = summary.latestLengthCm {
-                ReportTile(title: "Length", value: Units.length(cm, metric: metric), animal: "🦒", tint: Theme.weight,
+                ReportTile(title: "Length", value: Units.length(cm, metric: metric), animal: Theme.lengthAnimal, tint: Theme.weight,
                            lines: percentileLine(.length, cm))
             }
             if let cm = summary.latestHeadCm {
-                ReportTile(title: "Head size", value: Units.length(cm, metric: metric), animal: "🐣", tint: Theme.weight,
+                ReportTile(title: "Head size", value: Units.length(cm, metric: metric), animal: Theme.headAnimal, tint: Theme.weight,
                            lines: percentileLine(.head, cm))
             }
             ForEach(summary.milestones, id: \.self) { milestone in

@@ -18,8 +18,8 @@ struct ConfettiView: View {
         let color: Color
     }
 
-    private static let colors: [Color] = [Theme.hibiscus, Theme.sunshine, Theme.leaf, Theme.lagoon, Theme.mango, Theme.orchid]
-    private static let symbols = ["🎉", "🌺", "🍃", "⭐️", "🦁", "🌼"]
+    private static var colors: [Color] { [Theme.hibiscus, Theme.sunshine, Theme.leaf, Theme.lagoon, Theme.mango, Theme.orchid] }
+    private static var symbols: [String] { Theme.decor.confetti }
 
     private let pieces: [Piece] = (0..<90).map { i in
         Piece(

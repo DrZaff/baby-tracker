@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AuthService.self) private var auth
     @Environment(BabyStore.self) private var store
+    @AppStorage(AppTheme.storageKey) private var theme = AppTheme.jungle.rawValue
 
     var body: some View {
         Group {
@@ -22,6 +23,8 @@ struct RootView: View {
         }
         .tint(Theme.canopy)
         .fontDesign(.rounded)
+        // Picking a theme redraws everything in its colors and animals.
+        .id(theme)
         .task(id: auth.user?.uid) {
             if let email = auth.email {
                 store.start(email: email)
@@ -37,7 +40,11 @@ struct RootView: View {
 
 struct MainTabView: View {
     @Environment(BabyStore.self) private var store
-    @State private var tab = DesignPreview.isOn ? DesignPreview.tab : "today"
+    @State private var tab = MainTabView.lastTab {
+        didSet { MainTabView.lastTab = tab }
+    }
+    /// Kept across a theme change, which rebuilds the tabs, so the Family tab stays open.
+    static var lastTab = DesignPreview.isOn ? DesignPreview.tab : "today"
 
     var body: some View {
         if let baby = store.selectedBaby {
@@ -66,7 +73,7 @@ struct JungleLoading: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("🐒")
+            Text(Theme.decor.loading)
                 .font(.system(size: 64))
                 .rotationEffect(.degrees(swing ? 12 : -12), anchor: .top)
                 .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: swing)

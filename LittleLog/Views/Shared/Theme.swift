@@ -1,64 +1,76 @@
 import SwiftUI
 
-/// The jungle look: leafy greens, warm sand, sunshine and tropical flower colors,
-/// with a friendly animal for each kind of entry.
+/// Colors and animals for the current look (jungle by default; see AppTheme).
+/// Everything reads the chosen theme, and RootView redraws the app when it changes.
 enum Theme {
-    // Jungle palette. Each color has a lighter variant for dark mode ("night jungle").
-    static let canopy = dynamic(light: 0x2E6B4A, dark: 0x7FD49B)    // deep leaf green, the app's tint
-    static let leaf = dynamic(light: 0x5DB563, dark: 0x6CC774)
-    static let lime = dynamic(light: 0xB8E07E, dark: 0x5E8A3E)
-    static let sunshine = dynamic(light: 0xF7B731, dark: 0xF9C74F)
-    static let mango = dynamic(light: 0xF28C38, dark: 0xF6A05A)
-    static let hibiscus = dynamic(light: 0xE8566C, dark: 0xF0798B)
-    static let orchid = dynamic(light: 0x9B6BD3, dark: 0xB592E6)
-    static let lagoon = dynamic(light: 0x23A6A6, dark: 0x4CC9C4)
-    static let river = dynamic(light: 0x3F7FD0, dark: 0x6FA2E8)
-    static let dusk = dynamic(light: 0x5B5FC7, dark: 0x9A9DF0)
-    static let bark = dynamic(light: 0x6B4A2E, dark: 0xD9B98F)
+    private static var palette: ThemePalette { AppTheme.current.palette }
+    private static var art: ThemeArt { AppTheme.current.art }
 
-    /// Page background: warm sand by day, deep jungle by night.
-    static let sandTop = dynamic(light: 0xFFF7E6, dark: 0x0F1F17)
-    static let sandBottom = dynamic(light: 0xEAF6DF, dark: 0x132A1E)
+    // Palette. Each color has a lighter variant for dark mode.
+    static var canopy: Color { dynamic(palette.canopy) }    // the app's tint
+    static var leaf: Color { dynamic(palette.leaf) }
+    static var lime: Color { dynamic(palette.lime) }
+    static var sunshine: Color { dynamic(palette.sunshine) }
+    static var mango: Color { dynamic(palette.mango) }
+    static var hibiscus: Color { dynamic(palette.hibiscus) }
+    static var orchid: Color { dynamic(palette.orchid) }
+    static var lagoon: Color { dynamic(palette.lagoon) }
+    static var river: Color { dynamic(palette.river) }
+    static var dusk: Color { dynamic(palette.dusk) }
+    static var bark: Color { dynamic(palette.bark) }
+
+    /// Page background gradient.
+    static var sandTop: Color { dynamic(palette.backgroundTop) }
+    static var sandBottom: Color { dynamic(palette.backgroundBottom) }
     /// The light line down the middle of background leaves; faint at night.
     static let leafVein = Color(UIColor { $0.userInterfaceStyle == .dark
         ? UIColor(white: 1, alpha: 0.08)
         : UIColor(white: 1, alpha: 0.35) })
     /// Card surface on top of the background.
-    static let card = Color(UIColor { $0.userInterfaceStyle == .dark
-        ? UIColor(red: 0.12, green: 0.22, blue: 0.16, alpha: 0.92)
-        : UIColor(white: 1, alpha: 0.88) })
+    static var card: Color {
+        let night = palette.nightCard
+        return Color(UIColor { $0.userInterfaceStyle == .dark
+            ? UIColor(hex: night).withAlphaComponent(0.92)
+            : UIColor(white: 1, alpha: 0.88) })
+    }
 
     // What each kind of entry uses.
-    static let feed = hibiscus
-    static let bottle = mango
-    static let pump = orchid
-    static let sleep = dusk
-    static let tummy = leaf
-    static let diaper = lagoon
-    static let weight = river
-    static let milestone = sunshine
-    static let daycare = leaf
-    static let vaccine = orchid
+    static var feed: Color { hibiscus }
+    static var bottle: Color { mango }
+    static var pump: Color { orchid }
+    static var sleep: Color { dusk }
+    static var tummy: Color { leaf }
+    static var diaper: Color { lagoon }
+    static var weight: Color { river }
+    static var milestone: Color { sunshine }
+    static var daycare: Color { leaf }
+    static var vaccine: Color { orchid }
 
-    // Animal friends.
-    static let feedAnimal = "🐘"
-    static let bottleAnimal = "🦒"
-    static let pumpAnimal = "🦩"
-    static let sleepAnimal = "🐨"
-    static let tummyAnimal = "🐢"
-    static let diaperAnimal = "🐒"
-    static let weightAnimal = "🦛"
-    static let milestoneAnimal = "🦁"
-    static let daycareAnimal = "🦜"
-    static let pickUpAnimal = "🐯"
-    static let vaccineAnimal = "🦔"
+    // Animal friends (or rockets, dinosaurs, unicorns…).
+    static var feedAnimal: String { art.feed }
+    static var bottleAnimal: String { art.bottle }
+    static var pumpAnimal: String { art.pump }
+    static var sleepAnimal: String { art.sleep }
+    static var tummyAnimal: String { art.tummy }
+    static var diaperAnimal: String { art.diaper }
+    static var weightAnimal: String { art.weight }
+    static var lengthAnimal: String { art.length }
+    static var headAnimal: String { art.head }
+    static var milestoneAnimal: String { art.milestone }
+    static var daycareAnimal: String { art.daycare }
+    static var pickUpAnimal: String { art.pickUp }
+    static var vaccineAnimal: String { art.vaccine }
+    static var appointmentAnimal: String { art.appointment }
 
-    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
-        Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light) })
+    /// Little decorations: section icons, mascots and so on.
+    static var decor: ThemeArt { art }
+
+    private static func dynamic(_ color: ThemeColor) -> Color {
+        Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(hex: color.dark) : UIColor(hex: color.light) })
     }
 }
 
-private extension UIColor {
+extension UIColor {
     convenience init(hex: UInt32) {
         self.init(
             red: CGFloat((hex >> 16) & 0xFF) / 255,
@@ -152,35 +164,188 @@ struct Leaf: View {
     }
 }
 
-/// Sand-to-mint backdrop with leaves curling in from the corners.
+/// The page backdrop: the theme's gradient with its decorations around the edges
+/// (leaves, bubbles and waves, stars and a planet, ferns and a volcano, or hearts and sparkles).
 struct JungleBackground: View {
     var body: some View {
         GeometryReader { geo in
-            let w = geo.size.width
             ZStack(alignment: .topLeading) {
                 LinearGradient(colors: [Theme.sandTop, Theme.sandBottom], startPoint: .top, endPoint: .bottom)
-
-                // Top-left cluster
-                Leaf(color: Theme.leaf.opacity(0.28), width: w * 0.30, angle: 125)
-                    .position(x: w * 0.02, y: 10)
-                Leaf(color: Theme.canopy.opacity(0.18), width: w * 0.24, angle: 160)
-                    .position(x: w * 0.16, y: -10)
-                // Top-right cluster
-                Leaf(color: Theme.lime.opacity(0.35), width: w * 0.28, angle: -130)
-                    .position(x: w * 0.98, y: 20)
-                Leaf(color: Theme.leaf.opacity(0.2), width: w * 0.2, angle: -165)
-                    .position(x: w * 0.84, y: -6)
-                // Bottom corners
-                Leaf(color: Theme.leaf.opacity(0.22), width: w * 0.34, angle: 35)
-                    .position(x: w * 0.0, y: geo.size.height * 0.9)
-                Leaf(color: Theme.lime.opacity(0.3), width: w * 0.3, angle: -40)
-                    .position(x: w * 1.0, y: geo.size.height * 0.94)
-                Leaf(color: Theme.canopy.opacity(0.14), width: w * 0.22, angle: 10)
-                    .position(x: w * 0.88, y: geo.size.height * 0.86)
+                ThemeDecorations(size: geo.size)
             }
         }
         .ignoresSafeArea()
         .accessibilityHidden(true)
+    }
+}
+
+/// Just the decorations, sized to fit; also drawn on the doctor report's pages.
+struct ThemeDecorations: View {
+    let size: CGSize
+
+    var body: some View {
+        switch AppTheme.current {
+        case .jungle: JungleLeaves(size: size)
+        case .ocean: OceanDecor(size: size)
+        case .space: SpaceDecor(size: size)
+        case .dinosaur: DinoDecor(size: size)
+        case .princess: PrincessDecor(size: size)
+        }
+    }
+}
+
+private struct JungleLeaves: View {
+    let size: CGSize
+
+    var body: some View {
+        let w = size.width, h = size.height
+        ZStack(alignment: .topLeading) {
+            // Top-left cluster
+            Leaf(color: Theme.leaf.opacity(0.28), width: w * 0.30, angle: 125).position(x: w * 0.02, y: 10)
+            Leaf(color: Theme.canopy.opacity(0.18), width: w * 0.24, angle: 160).position(x: w * 0.16, y: -10)
+            // Top-right cluster
+            Leaf(color: Theme.lime.opacity(0.35), width: w * 0.28, angle: -130).position(x: w * 0.98, y: 20)
+            Leaf(color: Theme.leaf.opacity(0.2), width: w * 0.2, angle: -165).position(x: w * 0.84, y: -6)
+            // Bottom corners
+            Leaf(color: Theme.leaf.opacity(0.22), width: w * 0.34, angle: 35).position(x: w * 0.0, y: h * 0.9)
+            Leaf(color: Theme.lime.opacity(0.3), width: w * 0.3, angle: -40).position(x: w * 1.0, y: h * 0.94)
+            Leaf(color: Theme.canopy.opacity(0.14), width: w * 0.22, angle: 10).position(x: w * 0.88, y: h * 0.86)
+        }
+    }
+}
+
+/// A gentle wave across the bottom.
+struct WaveShape: Shape {
+    var crests: Double = 2
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.35))
+        let steps = 60
+        for step in 0...steps {
+            let x = rect.minX + rect.width * Double(step) / Double(steps)
+            let y = rect.minY + rect.height * (0.35 + 0.25 * sin(Double(step) / Double(steps) * crests * 2 * .pi))
+            path.addLine(to: CGPoint(x: x, y: y))
+        }
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct OceanDecor: View {
+    let size: CGSize
+
+    var body: some View {
+        let w = size.width, h = size.height
+        ZStack(alignment: .topLeading) {
+            // Bubbles rising in the top corners.
+            ForEach(Array([(0.06, 0.05, 0.11), (0.17, 0.11, 0.06), (0.08, 0.17, 0.04), (0.9, 0.06, 0.09), (0.8, 0.13, 0.05), (0.95, 0.19, 0.035)].enumerated()), id: \.offset) { _, b in
+                Circle()
+                    .fill(Theme.lime.opacity(0.25))
+                    .overlay(Circle().strokeBorder(Theme.lagoon.opacity(0.35), lineWidth: 1.5))
+                    .overlay(alignment: .topLeading) {
+                        Circle().fill(.white.opacity(0.55)).frame(width: w * b.2 * 0.28).offset(x: w * b.2 * 0.18, y: w * b.2 * 0.16)
+                    }
+                    .frame(width: w * b.2, height: w * b.2)
+                    .position(x: w * b.0, y: h * b.1)
+            }
+            // Waves along the bottom.
+            WaveShape(crests: 1.5).fill(Theme.lagoon.opacity(0.14)).frame(width: w, height: h * 0.16).position(x: w / 2, y: h * 0.93)
+            WaveShape(crests: 2).fill(Theme.river.opacity(0.12)).frame(width: w, height: h * 0.12).position(x: w / 2, y: h * 0.96)
+        }
+    }
+}
+
+private struct SpaceDecor: View {
+    let size: CGSize
+
+    private static let stars: [(Double, Double, Double)] = [
+        (0.05, 0.04, 3), (0.22, 0.09, 2), (0.36, 0.03, 2.5), (0.62, 0.06, 2), (0.12, 0.2, 2), (0.93, 0.25, 2.5),
+        (0.04, 0.42, 2), (0.97, 0.5, 2), (0.08, 0.66, 2.5), (0.9, 0.72, 2), (0.3, 0.92, 2), (0.55, 0.97, 2.5), (0.72, 0.9, 2),
+    ]
+
+    var body: some View {
+        let w = size.width, h = size.height
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(Self.stars.enumerated()), id: \.offset) { _, s in
+                Circle().fill(Theme.sunshine.opacity(0.55)).frame(width: s.2 * 2, height: s.2 * 2).position(x: w * s.0, y: h * s.1)
+            }
+            Image(systemName: "sparkle").font(.system(size: w * 0.07)).foregroundStyle(Theme.sunshine.opacity(0.45)).position(x: w * 0.12, y: h * 0.1)
+            Image(systemName: "sparkle").font(.system(size: w * 0.045)).foregroundStyle(Theme.orchid.opacity(0.4)).position(x: w * 0.84, y: h * 0.86)
+            // A ringed planet peeking in at the top right.
+            ZStack {
+                Circle().fill(LinearGradient(colors: [Theme.orchid.opacity(0.35), Theme.river.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                Ellipse().stroke(Theme.sunshine.opacity(0.35), lineWidth: w * 0.012).frame(width: w * 0.5, height: w * 0.12).rotationEffect(.degrees(-18))
+            }
+            .frame(width: w * 0.3, height: w * 0.3)
+            .position(x: w * 0.93, y: h * 0.06)
+            // A crescent moon at the bottom left.
+            Image(systemName: "moon.fill").font(.system(size: w * 0.22)).foregroundStyle(Theme.lime.opacity(0.5)).rotationEffect(.degrees(-20)).position(x: w * 0.05, y: h * 0.93)
+        }
+    }
+}
+
+/// A rounded volcano for the dinosaur theme.
+struct VolcanoShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addQuadCurve(to: CGPoint(x: rect.minX + rect.width * 0.38, y: rect.minY + rect.height * 0.12), control: CGPoint(x: rect.minX + rect.width * 0.3, y: rect.maxY * 0.6))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.62, y: rect.minY + rect.height * 0.12))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY), control: CGPoint(x: rect.minX + rect.width * 0.7, y: rect.maxY * 0.6))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private struct DinoDecor: View {
+    let size: CGSize
+
+    var body: some View {
+        let w = size.width, h = size.height
+        ZStack(alignment: .topLeading) {
+            // Palm and fern fronds in the top corners.
+            Leaf(color: Theme.leaf.opacity(0.26), width: w * 0.2, angle: 120).position(x: w * 0.02, y: 6)
+            Leaf(color: Theme.canopy.opacity(0.16), width: w * 0.16, angle: 150).position(x: w * 0.12, y: -8)
+            Leaf(color: Theme.lime.opacity(0.4), width: w * 0.2, angle: -125).position(x: w * 0.98, y: 14)
+            Leaf(color: Theme.leaf.opacity(0.18), width: w * 0.15, angle: -160).position(x: w * 0.88, y: -6)
+            // A friendly volcano with a little puff of smoke, bottom right.
+            VolcanoShape().fill(Theme.bark.opacity(0.16)).frame(width: w * 0.55, height: h * 0.16).position(x: w * 0.86, y: h * 0.93)
+            Capsule().fill(Theme.hibiscus.opacity(0.22)).frame(width: w * 0.1, height: w * 0.03).position(x: w * 0.86, y: h * 0.86)
+            Circle().fill(Theme.bark.opacity(0.08)).frame(width: w * 0.08).position(x: w * 0.83, y: h * 0.82)
+            Circle().fill(Theme.bark.opacity(0.06)).frame(width: w * 0.1).position(x: w * 0.88, y: h * 0.79)
+            // A fern at the bottom left.
+            Leaf(color: Theme.leaf.opacity(0.24), width: w * 0.26, angle: 30).position(x: w * 0.0, y: h * 0.92)
+            Leaf(color: Theme.lime.opacity(0.35), width: w * 0.18, angle: 60).position(x: w * 0.04, y: h * 0.96)
+        }
+    }
+}
+
+private struct PrincessDecor: View {
+    let size: CGSize
+
+    var body: some View {
+        let w = size.width, h = size.height
+        ZStack(alignment: .topLeading) {
+            symbol("heart.fill", Theme.hibiscus.opacity(0.18), w * 0.2, x: w * 0.06, y: h * 0.05, angle: -18)
+            symbol("heart.fill", Theme.orchid.opacity(0.16), w * 0.09, x: w * 0.2, y: h * 0.12, angle: 12)
+            symbol("sparkle", Theme.sunshine.opacity(0.5), w * 0.06, x: w * 0.3, y: h * 0.05, angle: 0)
+            symbol("crown.fill", Theme.sunshine.opacity(0.28), w * 0.18, x: w * 0.9, y: h * 0.06, angle: 14)
+            symbol("sparkle", Theme.orchid.opacity(0.35), w * 0.05, x: w * 0.78, y: h * 0.13, angle: 0)
+            symbol("heart.fill", Theme.hibiscus.opacity(0.14), w * 0.24, x: w * 0.04, y: h * 0.93, angle: 16)
+            symbol("sparkle", Theme.sunshine.opacity(0.45), w * 0.07, x: w * 0.22, y: h * 0.88, angle: 0)
+            symbol("heart.fill", Theme.orchid.opacity(0.16), w * 0.16, x: w * 0.94, y: h * 0.92, angle: -14)
+        }
+    }
+
+    private func symbol(_ name: String, _ color: Color, _ size: CGFloat, x: CGFloat, y: CGFloat, angle: Double) -> some View {
+        Image(systemName: name)
+            .font(.system(size: size))
+            .foregroundStyle(color)
+            .rotationEffect(.degrees(angle))
+            .position(x: x, y: y)
     }
 }
 

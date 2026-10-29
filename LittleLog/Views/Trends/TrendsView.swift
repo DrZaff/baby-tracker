@@ -201,7 +201,7 @@ struct ChartCard: View {
     let subtitle: String
     let unit: Calendar.Component
     let valueFormat: String
-    var animal: String = "🌿"
+    var animal: String = Theme.decor.reportIcon
     /// One color per series, in order.
     var colors: [Color] = [ChartPalette.first, ChartPalette.second]
     let points: [TrendPoint]

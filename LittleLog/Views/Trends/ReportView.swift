@@ -211,23 +211,24 @@ struct ReportData {
     }
 }
 
-/// Fixed light jungle colors for the printed report, so it looks the same whatever mode the phone is in.
+/// Fixed light colors from the chosen theme for the printed report, so it looks the same whatever mode the phone is in.
 enum ReportColors {
     static func hex(_ value: UInt32) -> Color {
         Color(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
     }
-    static let canopy = hex(0x2E6B4A)
-    static let leaf = hex(0x5DB563)
-    static let lime = hex(0xB8E07E)
-    static let sunshine = hex(0xF7B731)
-    static let mango = hex(0xF28C38)
-    static let hibiscus = hex(0xE8566C)
-    static let orchid = hex(0x9B6BD3)
-    static let lagoon = hex(0x23A6A6)
-    static let river = hex(0x3F7FD0)
-    static let bark = hex(0x6B4A2E)
-    static let sand = hex(0xFFF7E6)
-    static let mint = hex(0xEAF6DF)
+    private static var palette: ThemePalette { AppTheme.current.palette }
+    static var canopy: Color { hex(palette.canopy.light) }
+    static var leaf: Color { hex(palette.leaf.light) }
+    static var lime: Color { hex(palette.lime.light) }
+    static var sunshine: Color { hex(palette.sunshine.light) }
+    static var mango: Color { hex(palette.mango.light) }
+    static var hibiscus: Color { hex(palette.hibiscus.light) }
+    static var orchid: Color { hex(palette.orchid.light) }
+    static var lagoon: Color { hex(palette.lagoon.light) }
+    static var river: Color { hex(palette.river.light) }
+    static var bark: Color { hex(palette.bark.light) }
+    static var sand: Color { hex(palette.backgroundTop.light) }
+    static var mint: Color { hex(palette.backgroundBottom.light) }
     static let ink = hex(0x24312A)
     static let muted = hex(0x4F5C54)
 }
@@ -258,7 +259,7 @@ enum ReportPDF {
                 .frame(width: pageSize.width, height: pageSize.height, alignment: .top)
                 .background(ReportPageBackground())
                 .overlay(alignment: .bottom) {
-                    Text("🐘 Little Log · page \(number + 1) of \(pages.count)")
+                    Text("\(Theme.feedAnimal) Little Log · page \(number + 1) of \(pages.count)")
                         .font(.system(size: 8, design: .rounded))
                         .foregroundStyle(ReportColors.muted)
                         .padding(.bottom, 16)
@@ -337,10 +338,8 @@ private struct ReportPageBackground: View {
     var body: some View {
         ZStack {
             LinearGradient(colors: [ReportColors.sand, ReportColors.mint], startPoint: .top, endPoint: .bottom)
-            Leaf(color: ReportColors.leaf.opacity(0.16), width: 120, angle: 125).position(x: 6, y: 6)
-            Leaf(color: ReportColors.lime.opacity(0.28), width: 96, angle: -130).position(x: 606, y: 10)
-            Leaf(color: ReportColors.leaf.opacity(0.12), width: 130, angle: 35).position(x: 0, y: 760)
-            Leaf(color: ReportColors.lime.opacity(0.22), width: 110, angle: -40).position(x: 612, y: 770)
+            // Same decorations as the app's backgrounds, softened for paper.
+            ThemeDecorations(size: ReportPDF.pageSize).opacity(0.7)
         }
     }
 }
@@ -448,8 +447,8 @@ private struct ReportHeader: View {
                 Circle()
                     .fill(LinearGradient(colors: [ReportColors.lime, ReportColors.leaf.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 58, height: 58)
-                Text("🐘").font(.system(size: 32))
-                Text("🌺").font(.system(size: 13)).offset(x: 22, y: -22)
+                Text(Theme.feedAnimal).font(.system(size: 32))
+                Text(Theme.decor.accent).font(.system(size: 13)).offset(x: 22, y: -22)
             }
         }
     }
@@ -473,7 +472,7 @@ private struct ReportSummaryPage: View {
         VStack(alignment: .leading, spacing: 12) {
             ReportHeader(data: data, subtitle: "🩺 Care report for the pediatrician")
 
-            ReportCard(title: "Daily averages", icon: "🌿") {
+            ReportCard(title: "Daily averages", icon: Theme.decor.reportIcon) {
                 let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 2)
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                     ReportStat(title: "Feeds", value: String(format: "%.1f per day", perDay(Double(t.feedCount))), detail: "\(t.feedCount) in total", animal: Theme.feedAnimal, tint: ReportColors.hibiscus)
@@ -555,7 +554,7 @@ private struct ReportLogPage: View {
                         .foregroundStyle(ReportColors.muted)
                 }
                 Spacer()
-                Text("🐘 🐒 ⭐️").font(.system(size: 16))
+                Text("\(Theme.feedAnimal) \(Theme.diaperAnimal) ⭐️").font(.system(size: 16))
             }
 
             VStack(spacing: 0) {

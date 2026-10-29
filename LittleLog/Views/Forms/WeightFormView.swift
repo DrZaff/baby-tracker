@@ -93,7 +93,7 @@ struct WeightFormView: View {
                 LengthField(title: "Length", value: $length, metric: $lengthMetric)
                 LengthField(title: "Head size", value: $head, metric: $headMetric)
             } header: {
-                Text("🦒 Length and head")
+                Text("\(Theme.lengthAnimal) Length and head")
             } footer: {
                 Text("Fill in whatever you measured. Head size is the distance around the head.")
             }
